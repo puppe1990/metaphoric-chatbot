@@ -19,8 +19,8 @@ START_PROMPT_BY_MODE = {
 }
 
 RECEIVE_SYMBOLIC_GUIDE_MESSAGE = (
-    "Para achar sua metáfora, veja qual desses mundos encaixa melhor. "
-    "Se algum encaixar, eu desenvolvo por esse caminho."
+    "Escolha o mundo que mais encaixa. "
+    "Depois eu desenvolvo a metáfora por esse caminho."
 )
 
 REFINE_SELECTED_MESSAGE = (

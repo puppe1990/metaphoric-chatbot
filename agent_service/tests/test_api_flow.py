@@ -98,8 +98,8 @@ def test_message_endpoint_persists_transcript_and_advances_state(tmp_path, monke
     ]
     assert artifact["artifact_type"] == "receive_choice"
     assert body["messages"][-1]["content"] == (
-        "Para achar sua metáfora, veja qual desses mundos encaixa melhor. "
-        "Se algum encaixar, eu desenvolvo por esse caminho."
+        "Escolha o mundo que mais encaixa. "
+        "Depois eu desenvolvo a metáfora por esse caminho."
     )
     assert artifact["content"] != body["messages"][-1]["content"]
     assert artifact["metadata"] == {
@@ -194,7 +194,7 @@ def test_message_endpoint_refinement_request_in_present_choices_skips_literal_se
     assert body["messages"][-1]["role"] == "assistant"
 
 
-def test_message_endpoint_contextual_receive_suggestions_match_problem_language(tmp_path, monkeypatch):
+def test_message_endpoint_contextual_receive_suggestions_offer_symbolic_worlds(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
     monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
@@ -206,7 +206,9 @@ def test_message_endpoint_contextual_receive_suggestions_match_problem_language(
     assert response.status_code == 200
     body = response.json()
     choice_texts = [choice["text"].lower() for choice in body["artifacts"][0]["choices"]]
-    assert any("motor" in text or "corredor" in text or "comporta" in text for text in choice_texts)
+    assert "natureza: plantio, colheita, raiz, crescimento." in choice_texts
+    assert "guerra / estratégia: batalha, território, ataque, defesa." in choice_texts
+    assert "jornada / viagem: caminho, mapa, destino." in choice_texts
 
 
 def test_message_endpoint_refinement_request_keeps_active_metaphor_context(tmp_path, monkeypatch):
@@ -357,8 +359,8 @@ def test_message_endpoint_normalizes_malformed_receive_choices_into_safe_artifac
     }
     assert [choice["label"] for choice in body["artifacts"][0]["choices"]] == ["A", "B", "C", "D", "E"]
     assert body["messages"][-1]["content"] == (
-        "Para achar sua metáfora, veja qual desses mundos encaixa melhor. "
-        "Se algum encaixar, eu desenvolvo por esse caminho."
+        "Escolha o mundo que mais encaixa. "
+        "Depois eu desenvolvo a metáfora por esse caminho."
     )
     assert "A." in body["artifacts"][0]["content"]
     assert "B." in body["artifacts"][0]["content"]
@@ -500,7 +502,7 @@ def test_build_assistant_message_finalizes_receive_when_image_has_enough_materia
         user_input=(
             "assistant: Descreva o problema em uma frase simples.\n"
             "user: Sei o que quero, mas fico adiando.\n"
-            "assistant: Para achar sua metáfora, veja em qual mundo isso se encaixa melhor.\n"
+            "assistant: Em qual desses mundos isso se encaixa?\n"
             "user: C\n"
             "assistant: Boa. Agora diga como voce quer ajustar essa opcao.\n"
             "user: mais poetica\n"
@@ -655,7 +657,9 @@ def test_generate_contextual_choices_fallback_stays_in_user_semantic_field():
     artifact = generate_contextual_choices(LocalProvider(), "estou bloqueado")
 
     choice_texts = [choice.text.lower() for choice in artifact.choices]
-    assert any("bloque" in text or "trav" in text or "pres" in text for text in choice_texts)
+    assert "natureza: plantio, colheita, raiz, crescimento." in choice_texts
+    assert "guerra / estratégia: batalha, território, ataque, defesa." in choice_texts
+    assert "jornada / viagem: caminho, mapa, destino." in choice_texts
 
 
 def test_generate_contextual_choices_for_estou_preso_stays_in_stuck_semantic_field():
@@ -666,10 +670,12 @@ def test_generate_contextual_choices_for_estou_preso_stays_in_stuck_semantic_fie
 
     choice_texts = [choice.text.lower() for choice in artifact.choices]
     joined = " ".join(choice_texts)
-    assert "natureza: plantio" not in joined
-    assert "guerra / estratégia" not in joined
-    assert "jornada / viagem" not in joined
-    assert any("pres" in text or "trav" in text or "bloque" in text for text in choice_texts)
+    assert "natureza: plantio" in joined
+    assert "guerra / estratégia" in joined
+    assert "jornada / viagem" in joined
+    assert "corredor estreito entupido de caixas" not in joined
+    assert "motor que gira e nao engata" not in joined
+    assert "agua presa atras de uma comporta" not in joined
 
 
 @pytest.mark.parametrize("user_input", ["estou com pressa", "estou atravessado com isso"])
@@ -693,7 +699,7 @@ def test_generate_contextual_choices_avoids_rigid_quiz_framing():
 
     assert "Escolha A, B ou C" not in artifact.content
     assert "escolha a imagem" not in artifact.content.lower()
-    assert "em qual desses mundos isso se encaixa" in artifact.content.lower()
+    assert artifact.content.lower().startswith("em qual desses mundos isso se encaixa")
 
 
 def test_generate_contextual_choices_preserves_user_metaphor_field():
@@ -703,10 +709,11 @@ def test_generate_contextual_choices_preserves_user_metaphor_field():
     artifact = generate_contextual_choices(LocalProvider(), "um barco perdido no oceano")
 
     joined = " ".join(choice.text.lower() for choice in artifact.choices)
-    assert "barco" in joined or "oceano" in joined
-    assert "natureza: plantio" not in joined
-    assert "guerra / estratégia" not in joined
-    assert "energia / física" not in joined
+    assert "natureza: plantio" in joined
+    assert "guerra / estratégia" in joined
+    assert "energia / física" in joined
+    assert "barco" not in joined
+    assert "oceano" not in joined
 
 
 def test_hydrate_receive_choice_artifact_preserves_contextual_copy():
@@ -718,4 +725,4 @@ def test_hydrate_receive_choice_artifact_preserves_contextual_copy():
 
     assert hydrated.content == artifact.content
     assert "Escolha A, B ou C" not in hydrated.content
-    assert "em qual desses mundos isso se encaixa" in hydrated.content.lower()
+    assert hydrated.content.lower().startswith("em qual desses mundos isso se encaixa")

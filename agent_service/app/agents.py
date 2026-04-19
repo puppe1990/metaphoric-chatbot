@@ -77,7 +77,7 @@ def generate_receive_choices(provider: ChatProvider, user_input: str) -> Artifac
 
 def generate_contextual_choices(provider: ChatProvider, user_input: str) -> ArtifactView:
     raw_output = provider.invoke_chat(RECEIVE_CONTEXTUAL_PROMPT, user_input)
-    choices = _parse_receive_choices(raw_output) or _fallback_receive_choices(user_input)
+    choices = _parse_receive_choices(raw_output) or _fallback_contextual_choices()
     return ArtifactView(
         artifact_type="receive_choice",
         content=_format_contextual_choices_content(choices),
@@ -96,7 +96,7 @@ def hydrate_receive_choice_artifact(
 ) -> ArtifactView:
     choices = _parse_receive_choices(content)
     if choices is None:
-        choices = _fallback_receive_choices(content)
+        choices = _fallback_contextual_choices() if _is_contextual_choice_content(content) else _fallback_receive_choices(content)
 
     metadata_model = ArtifactMetadata.model_validate(metadata or {})
     return ArtifactView(
@@ -153,6 +153,16 @@ def _fallback_receive_choices(user_input: str) -> list[MetaphorChoice]:
             MetaphorChoice(label="E", text="Como pressão acumulada sem uma válvula de escape."),
         ]
 
+    return [
+        MetaphorChoice(label="A", text="Natureza: plantio, colheita, raiz, crescimento."),
+        MetaphorChoice(label="B", text="Guerra / estratégia: batalha, território, ataque, defesa."),
+        MetaphorChoice(label="C", text="Jornada / viagem: caminho, mapa, destino."),
+        MetaphorChoice(label="D", text="Máquina / engenharia: sistema, engrenagem, processo."),
+        MetaphorChoice(label="E", text="Energia / física: calor, pressão, força."),
+    ]
+
+
+def _fallback_contextual_choices() -> list[MetaphorChoice]:
     return [
         MetaphorChoice(label="A", text="Natureza: plantio, colheita, raiz, crescimento."),
         MetaphorChoice(label="B", text="Guerra / estratégia: batalha, território, ataque, defesa."),
@@ -365,7 +375,8 @@ def _has_sea_metaphor_language(normalized: str) -> bool:
 def _is_contextual_choice_content(content: str) -> bool:
     lowered = content.lower()
     return (
-        "para achar sua metáfora" in lowered
+        "em qual desses mundos isso se encaixa" in lowered
+        or "para achar sua metáfora" in lowered
         or "para achar sua metafora" in lowered
         or ("aqui vao tres possibilidades" in lowered and "escolha a imagem" not in lowered)
     )
@@ -379,8 +390,6 @@ def _format_receive_choices_content(choices: list[MetaphorChoice]) -> str:
 
 
 def _format_contextual_choices_content(choices: list[MetaphorChoice]) -> str:
-    lines = ["Para achar sua metáfora, veja em qual mundo isso se encaixa melhor:"]
+    lines = ["Em qual desses mundos isso se encaixa?"]
     lines.extend(f"{choice.label}. {choice.text}" for choice in choices)
-    lines.append("Se algum desses mundos encaixar, eu desenvolvo a metáfora por esse caminho.")
-    lines.append("Quando travar, pense: em qual desses mundos isso se encaixa?")
     return "\n".join(lines)

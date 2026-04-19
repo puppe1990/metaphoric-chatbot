@@ -94,23 +94,6 @@ class LocalProvider:
             )
 
         if system_prompt == RECEIVE_CONTEXTUAL_PROMPT:
-            latest = self._latest_user_line(user_prompt).lower()
-            if self._has_sea_metaphor_language(latest):
-                return (
-                    "A. Como um barco sem bússola rodando em círculos no mesmo trecho do oceano.\n"
-                    "B. Como um casco pequeno apanhando de ondas grandes sem ver a costa.\n"
-                    "C. Como um barco perdido sob neblina, ouvindo o mar mas sem achar direção.\n"
-                    "D. Como uma rota marítima longa demais para ser lida sem mapa.\n"
-                    "E. Como maré puxando para lados diferentes ao mesmo tempo.\n"
-                )
-            if self._has_stuck_language(latest):
-                return (
-                    "A. Como um corredor estreito entupido de caixas.\n"
-                    "B. Como um motor que gira e não engata.\n"
-                    "C. Como água presa atrás de uma comporta.\n"
-                    "D. Como uma engrenagem travada segurando a máquina toda.\n"
-                    "E. Como pressão acumulada sem conseguir sair.\n"
-                )
             return self._contextual_choices_response(user_prompt)
 
         if system_prompt == RECEIVE_FINAL_PROMPT:
@@ -180,14 +163,13 @@ class LocalProvider:
 
     def _contextual_choices_response(self, user_prompt: str) -> str:
         return (
-            "Para achar sua metáfora, veja em qual mundo isso se encaixa melhor:\n"
+            "Em qual desses mundos isso se encaixa?\n"
             "A. Natureza: plantio, colheita, raiz, crescimento.\n"
             "B. Guerra / estratégia: batalha, território, ataque, defesa.\n"
             "C. Jornada / viagem: caminho, mapa, destino.\n"
             "D. Máquina / engenharia: sistema, engrenagem, processo.\n"
             "E. Energia / física: calor, pressão, força.\n"
-            "Se algum desses mundos encaixar, eu desenvolvo a metáfora por esse caminho.\n"
-            "Quando travar, pense: em qual desses mundos isso se encaixa?\n"
+            "Escolha uma opção e eu desenvolvo a metáfora por esse caminho.\n"
         )
 
     def _receive_final_response(self, user_prompt: str) -> str:
