@@ -12,6 +12,7 @@ SESSION_CONTEXT_SQLITE_COLUMNS = {
     "last_user_intent": "VARCHAR(64)",
     "sensory_mode": "VARCHAR(32)",
     "suggestion_basis": "VARCHAR(255)",
+    "receive_llm_question_count": "INTEGER DEFAULT 0",
 }
 
 

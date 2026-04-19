@@ -1,5 +1,10 @@
 import React from "react";
-import { isReceiveChoiceArtifact, type ChatArtifact, type ChatMessage } from "../lib/api";
+import {
+  isReceiveChoiceArtifact,
+  isReceiveFinalComparisonArtifact,
+  type ChatArtifact,
+  type ChatMessage,
+} from "../lib/api";
 import { MetaphorChoiceList } from "./metaphor-choice-list";
 
 function getMessageTone(role: ChatMessage["role"]) {
@@ -23,23 +28,52 @@ function findLatestAssistantMessageIndex(messages: ChatMessage[]) {
     .find(({ message }) => message.role === "assistant")?.index ?? -1;
 }
 
+function expandSelectionMessage(message: ChatMessage, artifacts: ChatArtifact[]) {
+  if (message.role !== "user") {
+    return message.content;
+  }
+
+  const normalized = message.content.trim().toUpperCase();
+  if (!["A", "B", "C", "D", "E"].includes(normalized)) {
+    return message.content;
+  }
+
+  const latestReceiveChoiceArtifact = [...artifacts].reverse().find(isReceiveChoiceArtifact);
+  const matchedChoice = latestReceiveChoiceArtifact?.choices.find((choice) => choice.label === normalized);
+
+  if (!matchedChoice) {
+    return message.content;
+  }
+
+  return `${matchedChoice.label} — ${matchedChoice.text}`;
+}
+
 export function MessageList({
   artifacts = [],
   disabled = false,
+  inlineSuggestions = [],
   isThinking = false,
   messages,
   onChoiceSelect,
+  onInlineSuggestionSelect,
 }: {
   messages: ChatMessage[];
   artifacts?: ChatArtifact[];
   disabled?: boolean;
+  inlineSuggestions?: string[];
   isThinking?: boolean;
-  onChoiceSelect?: (label: "A" | "B" | "C") => void;
+  onChoiceSelect?: (label: "A" | "B" | "C" | "D" | "E") => void;
+  onInlineSuggestionSelect?: (suggestion: string) => void;
 }) {
   const receiveChoiceArtifact = [...artifacts].reverse().find(
     (artifact) => isReceiveChoiceArtifact(artifact) && artifact.metadata?.selected_option == null,
   );
+  const finalComparisonArtifact = [...artifacts].reverse().find(isReceiveFinalComparisonArtifact);
   const receiveChoiceMessageIndex = receiveChoiceArtifact ? findLatestAssistantMessageIndex(messages) : -1;
+  const latestAssistantMessageIndex = findLatestAssistantMessageIndex(messages);
+  const inlineSuggestionMessageIndex =
+    inlineSuggestions.length > 0 && receiveChoiceArtifact == null ? latestAssistantMessageIndex : -1;
+  const finalComparisonMessageIndex = finalComparisonArtifact ? latestAssistantMessageIndex : -1;
 
   return (
     <ol aria-label="Chat messages" className="space-y-3">
@@ -55,9 +89,55 @@ export function MessageList({
           <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] opacity-70">
             {getMessageLabel(message.role)}
           </p>
-          <p className="whitespace-pre-wrap text-sm leading-6 sm:text-[0.98rem]">{message.content}</p>
+          <p className="whitespace-pre-wrap text-sm leading-6 sm:text-[0.98rem]">
+            {expandSelectionMessage(message, artifacts)}
+          </p>
           {index === receiveChoiceMessageIndex && receiveChoiceArtifact ? (
             <MetaphorChoiceList choices={receiveChoiceArtifact.choices} disabled={disabled} onSelect={onChoiceSelect} />
+          ) : null}
+          {index === inlineSuggestionMessageIndex ? (
+            <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Refinement suggestions">
+              {inlineSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  className="rounded-lg border border-ink/10 bg-fog px-3 py-1.5 text-left text-xs font-medium text-clay transition-colors hover:border-ink/20 hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={disabled}
+                  onClick={() => onInlineSuggestionSelect?.(suggestion)}
+                  type="button"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {index === finalComparisonMessageIndex && finalComparisonArtifact ? (
+            <div className="mt-4 grid gap-3 md:grid-cols-2" aria-label="Comparação de metáforas finais">
+              {finalComparisonArtifact.comparison_variants.map((variant) => (
+                <section
+                  key={variant.style}
+                  className={[
+                    "rounded-lg border border-ink/10 px-4 py-3 text-ink",
+                    variant.status === "pending" ? "bg-white" : "bg-fog/70",
+                  ].join(" ")}
+                >
+                  <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] opacity-70">
+                    {variant.title}
+                  </p>
+                  <p
+                    className={[
+                      "whitespace-pre-wrap text-sm leading-6 sm:text-[0.98rem]",
+                      variant.status === "pending" ? "animate-pulse text-clay" : "",
+                    ].join(" ")}
+                  >
+                    {variant.status === "pending"
+                      ? "Pensando..."
+                      : variant.status === "error"
+                        ? "Não consegui gerar esta variação agora."
+                        : variant.text}
+                  </p>
+                </section>
+              ))}
+            </div>
           ) : null}
         </li>
       ))}

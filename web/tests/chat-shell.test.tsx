@@ -2,7 +2,11 @@ import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ChatShell } from "../components/chat-shell";
-import { RECEIVE_CHOICE_ARTIFACT_TYPE, type GuidedSessionView } from "../lib/api";
+import {
+  RECEIVE_CHOICE_ARTIFACT_TYPE,
+  RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE,
+  type GuidedSessionView,
+} from "../lib/api";
 
 describe("ChatShell", () => {
   it("renders the guided view model and supports draft input", () => {
@@ -32,7 +36,9 @@ describe("ChatShell", () => {
     expect(screen.getByRole("button", { name: "O que está travando?" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Onde a tensão aparece?" })).toBeInTheDocument();
     expect(
-      screen.getByText("Descreva o problema em uma frase. Se eu tiver contexto suficiente, já te mostro 3 caminhos."),
+      screen.getByText(
+        "Descreva o problema em uma frase. Se eu tiver contexto suficiente, já te mostro mundos simbólicos para desenvolver sua metáfora.",
+      ),
     ).toBeInTheDocument();
 
     const input = screen.getByLabelText("Message input");
@@ -222,13 +228,15 @@ describe("ChatShell", () => {
           content: "Mensagem antiga que nao deve ser usada para pareamento.",
           metadata: {
             clarifier_asked: false,
-            internal_candidate_count: 3,
+            internal_candidate_count: 5,
             selected_option: null,
           },
           choices: [
             { label: "A", text: "Uma ponte oscilando no vento." },
             { label: "B", text: "Um motor girando sem engatar." },
             { label: "C", text: "Uma porta pesada que quase cede." },
+            { label: "D", text: "Um mapa cheio de desvios." },
+            { label: "E", text: "Uma caldeira perto do limite." },
           ],
         },
       ],
@@ -254,6 +262,58 @@ describe("ChatShell", () => {
     expect(
       within(latestAssistantMessage).getByRole("button", { name: "C Uma porta pesada que quase cede." }),
     ).toBeInTheDocument();
+    expect(within(latestAssistantMessage).getByRole("button", { name: "D Um mapa cheio de desvios." })).toBeInTheDocument();
+    expect(
+      within(latestAssistantMessage).getByRole("button", { name: "E Uma caldeira perto do limite." }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders final metaphor comparisons side by side under the latest assistant message", () => {
+    const session: GuidedSessionView = {
+      token: "tok_compare",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "refine_selected",
+      messages: [
+        { role: "assistant", content: "Descreva o problema em uma frase simples." },
+        { role: "user", content: "Estou travado para tomar uma decisão." },
+        { role: "assistant", content: "Aqui estão duas leituras finais do mesmo núcleo metafórico." },
+      ],
+      artifacts: [
+        {
+          artifact_type: RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE,
+          content: "[]",
+          metadata: null,
+          choices: [],
+          comparison_variants: [
+            {
+              style: "erickson",
+              title: "Erickson / insinuante",
+              text: "Primeiro parágrafo.\n\nSegundo parágrafo.\n\nTerceiro parágrafo.",
+            },
+            {
+              style: "bandler",
+              title: "Bandler / cinematográfica",
+              text: "Cena um.\n\nCena dois.\n\nCena três.",
+            },
+          ],
+        },
+      ],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: [],
+    };
+
+    render(<ChatShell session={session} />);
+
+    const transcriptItems = screen.getAllByRole("listitem");
+    const latestAssistantMessage = transcriptItems[2];
+
+    expect(within(latestAssistantMessage).getByText("Erickson / insinuante")).toBeInTheDocument();
+    expect(within(latestAssistantMessage).getByText("Bandler / cinematográfica")).toBeInTheDocument();
+    expect(within(latestAssistantMessage).getByText(/Primeiro parágrafo/)).toBeInTheDocument();
+    expect(within(latestAssistantMessage).getByText(/Cena um/)).toBeInTheDocument();
   });
 
   it("hides stale receive-choice artifacts after a selection was made during refinement", () => {
@@ -274,13 +334,15 @@ describe("ChatShell", () => {
           content: "Escolha a imagem que melhor descreve seu momento.",
           metadata: {
             clarifier_asked: false,
-            internal_candidate_count: 3,
+            internal_candidate_count: 5,
             selected_option: "B",
           },
           choices: [
             { label: "A", text: "Uma ponte oscilando no vento." },
             { label: "B", text: "Um motor girando sem engatar." },
             { label: "C", text: "Uma porta pesada que quase cede." },
+            { label: "D", text: "Um mapa cheio de desvios." },
+            { label: "E", text: "Uma caldeira perto do limite." },
           ],
         },
       ],
@@ -303,7 +365,111 @@ describe("ChatShell", () => {
     expect(
       within(refinementPrompt).queryByRole("button", { name: "C Uma porta pesada que quase cede." }),
     ).toBeNull();
+    expect(within(refinementPrompt).queryByRole("button", { name: "D Um mapa cheio de desvios." })).toBeNull();
+    expect(within(refinementPrompt).queryByRole("button", { name: "E Uma caldeira perto do limite." })).toBeNull();
     expect(screen.queryByRole("button", { name: "A Uma ponte oscilando no vento." })).toBeNull();
+    expect(screen.getByText("B — Um motor girando sem engatar.")).toBeInTheDocument();
+  });
+
+  it("renders refinement suggestions as clickable actions inside the latest assistant message", () => {
+    const session: GuidedSessionView = {
+      token: "tok_refine_actions",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "refine_selected",
+      messages: [
+        { role: "assistant", content: "Escolha a imagem que melhor descreve seu momento." },
+        { role: "user", content: "B" },
+        {
+          role: "assistant",
+          content: "Boa. Agora diga como você quer ajustar essa opção: mais curta, mais concreta, mais poética ou mais direta.",
+        },
+      ],
+      artifacts: [],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: ["Mais curta.", "Mais concreta.", "Mais poética.", "Mais direta."],
+    };
+
+    render(<ChatShell session={session} />);
+
+    const transcriptItems = screen.getAllByRole("listitem");
+    const refinementPrompt = transcriptItems[2];
+
+    expect(within(refinementPrompt).getByRole("button", { name: "Mais curta." })).toBeInTheDocument();
+    expect(within(refinementPrompt).getByRole("button", { name: "Mais concreta." })).toBeInTheDocument();
+    expect(within(refinementPrompt).getByRole("button", { name: "Mais poética." })).toBeInTheDocument();
+    expect(within(refinementPrompt).getByRole("button", { name: "Mais direta." })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mais curta." })).toBeInTheDocument();
+    expect(screen.queryByText("Sua próxima linha")).toBeInTheDocument();
+  });
+
+  it("submits a refinement suggestion through the existing chat form flow", async () => {
+    const submissions: string[] = [];
+    const handleSubmit = vi.fn((event: React.FormEvent<HTMLFormElement>) => {
+      const input = event.currentTarget.querySelector("textarea");
+      submissions.push(input?.value ?? "");
+    });
+
+    const session: GuidedSessionView = {
+      token: "tok_refine_submit",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "refine_selected",
+      messages: [
+        { role: "assistant", content: "Escolha a imagem que melhor descreve seu momento." },
+        { role: "user", content: "B" },
+        {
+          role: "assistant",
+          content: "Boa. Agora diga como você quer ajustar essa opção: mais curta, mais concreta, mais poética ou mais direta.",
+        },
+      ],
+      artifacts: [],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: ["Mais curta.", "Mais concreta.", "Mais poética.", "Mais direta."],
+    };
+
+    render(<ChatShell onInputSubmit={handleSubmit} session={session} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Mais concreta." }));
+
+    await waitFor(() => expect(handleSubmit).toHaveBeenCalledTimes(1));
+    expect(submissions).toEqual(["Mais concreta."]);
+    expect(screen.getByLabelText("Message input")).toHaveValue("");
+  });
+
+  it("hides refinement suggestions when the latest assistant message has already moved to a new question", () => {
+    const session: GuidedSessionView = {
+      token: "tok_refine_followup",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "refine_selected",
+      messages: [
+        { role: "assistant", content: "Escolha a imagem que melhor descreve seu momento." },
+        { role: "user", content: "B" },
+        { role: "user", content: "Mais poética." },
+        {
+          role: "assistant",
+          content:
+            "Então, no mundo A que você escolheu, que elemento concreto (um objeto, uma paisagem ou um som) poderia simbolizar a decisão que ainda está em suspenso?",
+        },
+      ],
+      artifacts: [],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: ["Mais curta.", "Mais concreta.", "Mais poética.", "Mais direta."],
+    };
+
+    render(<ChatShell session={session} />);
+
+    expect(screen.queryByRole("button", { name: "Mais curta." })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mais concreta." })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mais poética." })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mais direta." })).toBeNull();
   });
 
   it("submits a receive-choice selection through the existing chat form flow", async () => {
@@ -328,13 +494,15 @@ describe("ChatShell", () => {
           content: "Escolha a imagem que melhor descreve seu momento.",
           metadata: {
             clarifier_asked: false,
-            internal_candidate_count: 3,
+            internal_candidate_count: 5,
             selected_option: null,
           },
           choices: [
             { label: "A", text: "Uma ponte oscilando no vento." },
             { label: "B", text: "Um motor girando sem engatar." },
             { label: "C", text: "Uma porta pesada que quase cede." },
+            { label: "D", text: "Um mapa cheio de desvios." },
+            { label: "E", text: "Uma caldeira perto do limite." },
           ],
         },
       ],

@@ -1,4 +1,10 @@
-import { isReceiveChoiceArtifact, type ChatArtifact, type ChatMessage, type GuidedSessionView } from "./api";
+import {
+  isReceiveChoiceArtifact,
+  isReceiveFinalComparisonArtifact,
+  type ChatArtifact,
+  type ChatMessage,
+  type GuidedSessionView,
+} from "./api";
 
 function getMarkdownHeading(role: ChatMessage["role"]) {
   if (role === "assistant") return "Assistente";
@@ -28,8 +34,21 @@ function findPresentedChoices(artifacts: ChatArtifact[], messages: ChatMessage[]
   };
 }
 
+function findFinalComparison(artifacts: ChatArtifact[], messages: ChatMessage[]) {
+  const comparisonArtifact = [...artifacts].reverse().find(isReceiveFinalComparisonArtifact);
+  if (!comparisonArtifact) {
+    return null;
+  }
+
+  return {
+    artifact: comparisonArtifact,
+    messageIndex: findLatestAssistantMessageIndex(messages),
+  };
+}
+
 export function buildChatMarkdown(session: GuidedSessionView) {
   const presentedChoices = findPresentedChoices(session.artifacts, session.messages);
+  const finalComparison = findFinalComparison(session.artifacts, session.messages);
   const lines: string[] = [
     `# ${session.title}`,
     "",
@@ -46,6 +65,14 @@ export function buildChatMarkdown(session: GuidedSessionView) {
 
       for (const choice of presentedChoices.artifact.choices) {
         lines.push(`- ${choice.label}: ${choice.text}`);
+      }
+    }
+
+    if (finalComparison && finalComparison.messageIndex === index) {
+      lines.push("", "### Comparação final", "");
+
+      for (const variant of finalComparison.artifact.comparison_variants) {
+        lines.push(`#### ${variant.title}`, "", variant.text, "");
       }
     }
   }

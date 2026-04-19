@@ -9,12 +9,21 @@ from app.prompts import (
     GENERATOR_PROMPT,
     RECEIVE_CHOICES_PROMPT,
     RECEIVE_CONTEXTUAL_PROMPT,
-    RECEIVE_FINAL_PROMPT,
+    RECEIVE_FINAL_BANDLER_PROMPT,
+    RECEIVE_FINAL_ERICKSON_PROMPT,
     TURN_INTERPRETER_PROMPT,
 )
 
 
 class LocalProvider:
+    SYMBOLIC_WORLD_BY_LABEL = {
+        "A": "natureza",
+        "B": "guerra",
+        "C": "jornada",
+        "D": "máquina",
+        "E": "energia",
+    }
+
     def invoke_chat(self, system_prompt: str, user_prompt: str) -> str:
         if system_prompt == EXTRACTOR_PROMPT:
             return (
@@ -36,7 +45,7 @@ class LocalProvider:
         if system_prompt == TURN_INTERPRETER_PROMPT:
             latest = self._latest_user_line(user_prompt)
             latest_normalized = latest.strip().lower()
-            if latest.upper() in {"A", "B", "C"}:
+            if latest.upper() in {"A", "B", "C", "D", "E"}:
                 return (
                     '{"intent":"agent_option_selection","active_metaphor_seed":null,'
                     '"sensory_mode":null,"suggestion_basis":"literal-choice"}'
@@ -94,23 +103,13 @@ class LocalProvider:
             )
 
         if system_prompt == RECEIVE_CONTEXTUAL_PROMPT:
-            latest = self._latest_user_line(user_prompt).lower()
-            if self._has_sea_metaphor_language(latest):
-                return (
-                    "A. Como um barco sem bússola rodando em círculos no mesmo trecho do oceano.\n"
-                    "B. Como um casco pequeno apanhando de ondas grandes sem ver a costa.\n"
-                    "C. Como um barco perdido sob neblina, ouvindo o mar mas sem achar direção.\n"
-                )
-            if self._has_stuck_language(latest):
-                return (
-                    "A. Como um corredor estreito entupido de caixas.\n"
-                    "B. Como um motor que gira e não engata.\n"
-                    "C. Como água presa atrás de uma comporta.\n"
-                )
             return self._contextual_choices_response(user_prompt)
 
-        if system_prompt == RECEIVE_FINAL_PROMPT:
-            return self._receive_final_response(user_prompt)
+        if system_prompt == RECEIVE_FINAL_ERICKSON_PROMPT:
+            return self._receive_final_response(user_prompt, style="erickson")
+
+        if system_prompt == RECEIVE_FINAL_BANDLER_PROMPT:
+            return self._receive_final_response(user_prompt, style="bandler")
 
         if system_prompt == COACH_PROMPT:
             return self._coach_response(user_prompt)
@@ -126,9 +125,16 @@ class LocalProvider:
         latest = user_lines[-1] if user_lines else user_prompt.strip()
         previous = " ".join(user_lines[:-1])
         symbol = self._extract_symbol(previous) or "essa imagem"
+        selected_world = self._selected_symbolic_world(user_lines)
+        has_concrete_user_image = self._has_concrete_user_image(user_lines[:-1])
         latest_lower = latest.lower()
 
         if self._is_refinement_request(latest_lower):
+            if selected_world and not has_concrete_user_image:
+                return (
+                    f"Então, na {selected_world} que você escolheu, que elemento concreto "
+                    "(um objeto, uma paisagem ou um som) poderia simbolizar a decisão que ainda está em suspenso?"
+                )
             return (
                 f"Então o centro continua claro: {symbol}. "
                 "O que deixa essa imagem mais nítida agora: a direção falha, a neblina fecha, ou a costa some?"
@@ -147,6 +153,23 @@ class LocalProvider:
             )
 
         if latest:
+            if selected_world == "guerra" and self._war_blockage_needs_tactic(latest_lower):
+                return (
+                    "Então a muralha já mostrou o problema com nitidez. "
+                    "O que entra nessa cena como tática real: mira, ritmo, alcance ou janela de ataque?"
+                )
+            if "engren" in latest_lower and "emperr" in latest_lower:
+                return (
+                    "Então, a engrenagem está emperrada. "
+                    "O que essa engrenagem precisa destravar para a máquina voltar a andar?"
+                )
+            if "máquina imensa" in latest_lower or "maquina imensa" in latest_lower:
+                return (
+                    "Então, essa engrenagem emperrada segura uma máquina imensa inteira. "
+                    "O que entra nessa cena para forçar esse destravamento?"
+                )
+            if "alavanca" in latest_lower:
+                return "Então a alavanca já entrou na cena. O que faz essa alavanca ter força de verdade nessa cena?"
             return (
                 f"Então {latest} já pode ser o centro da imagem, sem precisar corrigir nada agora. "
                 "O que essa imagem faz com a cena quando o conflito aparece?"
@@ -169,27 +192,23 @@ class LocalProvider:
             f"B. Como uma gaveta emperrada: você puxa, hesita, solta, e tudo fica preso no meio em {scene}.\n"
             "C. Como três rádios ligados ao mesmo tempo: sinais disputam espaço "
             f"e nenhuma música consegue abrir caminho em {scene}.\n"
-            "Escolha A, B ou C."
+            f"D. Como uma ponte longa demais para atravessar sem mapa em {scene}.\n"
+            f"E. Como uma caldeira acumulando pressão por dentro em {scene}.\n"
+            "Escolha uma opção para eu desenvolver."
         )
 
     def _contextual_choices_response(self, user_prompt: str) -> str:
-        user_lines = [
-            line.split(":", 1)[1].strip()
-            for line in user_prompt.splitlines()
-            if line.lower().startswith("user:") and ":" in line
-        ]
-        latest = user_lines[-1] if user_lines else user_prompt.strip()
-        scene = latest.rstrip(".!?") or "isso"
-
         return (
-            "A. Como um carro girando em falso na lama: faz barulho, força o motor, mas não sai do lugar em "
-            f"{scene}.\n"
-            f"B. Como uma gaveta emperrada: você puxa, hesita, solta, e tudo fica preso no meio em {scene}.\n"
-            "C. Como três rádios ligados ao mesmo tempo: sinais disputam espaço "
-            f"e nenhuma música consegue abrir caminho em {scene}.\n"
+            "Em qual desses mundos isso se encaixa?\n"
+            "A. Natureza: plantio, colheita, raiz, crescimento.\n"
+            "B. Guerra / estratégia: batalha, território, ataque, defesa.\n"
+            "C. Jornada / viagem: caminho, mapa, destino.\n"
+            "D. Máquina / engenharia: sistema, engrenagem, processo.\n"
+            "E. Energia / física: calor, pressão, força.\n"
+            "Escolha uma opção e eu desenvolvo a metáfora por esse caminho.\n"
         )
 
-    def _receive_final_response(self, user_prompt: str) -> str:
+    def _receive_final_response(self, user_prompt: str, style: str) -> str:
         user_lines = [
             line.split(":", 1)[1].strip()
             for line in user_prompt.splitlines()
@@ -215,11 +234,57 @@ class LocalProvider:
         ]
         seed = substantive_lines[-1] if substantive_lines else "essa imagem"
         anchor = substantive_lines[-2] if len(substantive_lines) > 1 else "o conflito antigo"
+        selected_world = self._selected_symbolic_world(user_lines)
+
+        if selected_world == "guerra" or self._contains_war_imagery(seed, anchor):
+            return self._receive_war_final_response(anchor=anchor, seed=seed, style=style)
+
+        if style == "erickson":
+            return (
+                f"Quando {anchor} toma a cena inteira, parece que tudo ao redor aprende a se contrair junto, "
+                "como se o espaço também passasse a obedecer ao mesmo aperto.\n\n"
+                f"Então {seed} deixa de ser só presença e começa a mudar o compasso da imagem, "
+                "empurrando a tensão para outro ponto, onde ela já não consegue mandar do mesmo jeito.\n\n"
+                "E, no instante em que essa pressão perde o centro, aparece uma folga pequena, mas real. "
+                "Às vezes é isso que basta para o movimento voltar antes mesmo de a cena inteira entender por quê."
+            )
 
         return (
-            f"Fica como uma luta antiga no mesmo ringue: {anchor} segue ali, gastando força, "
-            f"enquanto {seed} tenta atravessar o ruído sem desaparecer. E o que antes era só briga cega "
-            "começa a virar um instante de definição, como se a cena finalmente mostrasse qual som ainda fica de pé."
+            f"{anchor.capitalize()} aperta a cena até sobrar pouco ar entre uma coisa e outra. "
+            "O peso fica concentrado, o corpo sente onde a pressão encosta, "
+            "e o resto do quadro gira em torno desse mesmo ponto.\n\n"
+            f"Então {seed} entra com impacto nítido, mexendo no ritmo, "
+            "deslocando força, abrindo contraste onde antes só havia "
+            "compressão contínua.\n\n"
+            "Quando a pressão sai do lugar antigo, a imagem responde inteira. "
+            "O aperto perde domínio, surge espaço para passagem, e o que estava encurralado volta a encontrar direção."
+        )
+
+    def _receive_war_final_response(self, *, anchor: str, seed: str, style: str) -> str:
+        if style == "erickson":
+            return (
+                f"Diante de {anchor}, a distância parece sempre maior no instante em que alguém pensa em avançar. "
+                "A pedra segura o campo, o corpo mede o peso do obstáculo, "
+                "e por um tempo tudo parece pedir recuo.\n\n"
+                f"Então {seed} deixa de ser pressa e vira cálculo: ajustar a base, "
+                "sentir o alcance, esperar o ponto certo "
+                "em que a tensão para de se espalhar e começa a obedecer.\n\n"
+                "E, quando o primeiro impacto encontra a mesma fissura duas vezes, "
+                "a muralha já não parece inteira do mesmo jeito. "
+                "Às vezes a passagem não nasce de derrubar tudo, mas de descobrir onde a pedra começou a ceder."
+            )
+
+        return (
+            f"{anchor.capitalize()} ocupa o campo inteiro, grossa, alta, "
+            "fechando a passagem como se cada bloco empurrasse o outro para o mesmo lugar. "
+            "O ar pesa antes de qualquer movimento, e chegar perto só faz o tamanho dela aparecer mais.\n\n"
+            f"Então {seed} entra na cena com precisão bruta: madeira tensionada, "
+            "base firme, braço puxado no limite, cálculo de alcance e mira presa "
+            "no mesmo ponto da pedra. "
+            "Nada explode de uma vez; o trabalho é bater onde a rocha devolve menos resistência.\n\n"
+            "Depois de alguns disparos no mesmo lugar, surge um som oco, curto, diferente do resto. "
+            "A brecha ainda é estreita, mas agora existe, e o campo muda inteiro "
+            "quando a muralha deixa de parecer absoluta."
         )
 
     def _extract_symbol(self, text: str) -> str | None:
@@ -277,6 +342,28 @@ class LocalProvider:
             re.search(rf"\b{re.escape(marker)}\b", normalized, flags=re.IGNORECASE) for marker in concrete_image_markers
         )
 
+    def _war_blockage_needs_tactic(self, normalized: str) -> bool:
+        return bool(
+            re.search(
+                (
+                    r"\b(n[aã]o consigo passar|intranspon[ií]vel|bloqueia|bloqueando|"
+                    r"muralha|barreira|forte e densa|forte|densa)\b"
+                ),
+                normalized,
+                flags=re.IGNORECASE,
+            )
+        )
+
+    def _contains_war_imagery(self, *values: str) -> bool:
+        return any(
+            re.search(
+                r"\b(muralha|catapulta|brecha|fortaleza|cerco|trincheira|ataque|campo)\b",
+                value,
+                flags=re.IGNORECASE,
+            )
+            for value in values
+        )
+
     def _has_stuck_language(self, normalized: str) -> bool:
         return bool(
             re.search(
@@ -296,6 +383,7 @@ class LocalProvider:
         )
 
     def _is_refinement_request(self, normalized: str) -> bool:
+        normalized = normalized.strip().rstrip(".!?")
         direct_markers = {
             "mais curta",
             "mais curto",
@@ -325,3 +413,23 @@ class LocalProvider:
         if user_lines:
             return user_lines[-1]
         return user_prompt.strip()
+
+    def _selected_symbolic_world(self, user_lines: list[str]) -> str | None:
+        for line in reversed(user_lines):
+            normalized = line.strip().upper()
+            if normalized in self.SYMBOLIC_WORLD_BY_LABEL:
+                return self.SYMBOLIC_WORLD_BY_LABEL[normalized]
+        return None
+
+    def _has_concrete_user_image(self, user_lines: list[str]) -> bool:
+        for line in reversed(user_lines):
+            normalized = line.strip()
+            if not normalized:
+                continue
+            if normalized.upper() in self.SYMBOLIC_WORLD_BY_LABEL:
+                continue
+            if self._is_refinement_request(normalized.lower()):
+                continue
+            if self._looks_like_user_metaphor(normalized):
+                return True
+        return False

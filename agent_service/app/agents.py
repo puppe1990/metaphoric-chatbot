@@ -11,14 +11,15 @@ from .prompts import (
     GENERATOR_PROMPT,
     RECEIVE_CHOICES_PROMPT,
     RECEIVE_CONTEXTUAL_PROMPT,
-    RECEIVE_FINAL_PROMPT,
+    RECEIVE_FINAL_BANDLER_PROMPT,
+    RECEIVE_FINAL_ERICKSON_PROMPT,
     TURN_INTERPRETER_PROMPT,
 )
 from .providers.base import ChatProvider
-from .schemas import ArtifactMetadata, ArtifactView, MetaphorChoice, TurnIntent
+from .schemas import ArtifactMetadata, ArtifactView, ChoiceLabel, FinalMetaphorVariant, MetaphorChoice, TurnIntent
 
-CHOICE_LABELS = ("A", "B", "C")
-CHOICE_PATTERN = re.compile(r"(?ims)^\s*([ABC])\s*[\.\):-]\s*(.+?)(?=^\s*[ABC]\s*[\.\):-]\s*|\Z)")
+CHOICE_LABELS: tuple[ChoiceLabel, ...] = ("A", "B", "C", "D", "E")
+CHOICE_PATTERN = re.compile(r"(?ims)^\s*([A-E])\s*[\.\):-]\s*(.+?)(?=^\s*[A-E]\s*[\.\):-]\s*|\Z)")
 
 
 class TurnInterpretation(BaseModel):
@@ -26,6 +27,7 @@ class TurnInterpretation(BaseModel):
     active_metaphor_seed: str | None = None
     sensory_mode: str | None = None
     suggestion_basis: str | None = None
+    assistant_response_kind: str | None = None
 
 
 def extract_symbolic_structure(provider: ChatProvider, user_input: str) -> str:
@@ -40,8 +42,99 @@ def coach_metaphor(provider: ChatProvider, user_input: str) -> str:
     return provider.invoke_chat(COACH_PROMPT, user_input)
 
 
-def finalize_receive_metaphor(provider: ChatProvider, user_input: str) -> str:
-    return provider.invoke_chat(RECEIVE_FINAL_PROMPT, user_input)
+def finalize_receive_metaphor_comparison(provider: ChatProvider, user_input: str) -> ArtifactView:
+    erickson_text = provider.invoke_chat(RECEIVE_FINAL_ERICKSON_PROMPT, user_input)
+    bandler_text = provider.invoke_chat(RECEIVE_FINAL_BANDLER_PROMPT, user_input)
+    variants = [
+        FinalMetaphorVariant(
+            style="erickson",
+            title="Erickson / insinuante",
+            text=erickson_text,
+        ),
+        FinalMetaphorVariant(
+            style="bandler",
+            title="Bandler / cinematográfica",
+            text=bandler_text,
+        ),
+    ]
+    return ArtifactView(
+        artifact_type="receive_final_comparison",
+        content=_format_final_comparison_content(variants),
+        comparison_variants=variants,
+    )
+
+
+def build_pending_receive_final_comparison() -> ArtifactView:
+    variants = [
+        FinalMetaphorVariant(
+            style="erickson",
+            title="Erickson / insinuante",
+            status="pending",
+            text="",
+        ),
+        FinalMetaphorVariant(
+            style="bandler",
+            title="Bandler / cinematográfica",
+            status="pending",
+            text="",
+        ),
+    ]
+    return ArtifactView(
+        artifact_type="receive_final_comparison",
+        content=_format_final_comparison_content(variants),
+        comparison_variants=variants,
+    )
+
+
+def generate_symbolic_world_choices() -> ArtifactView:
+    choices = _fallback_contextual_choices()
+    return ArtifactView(
+        artifact_type="receive_choice",
+        content=_format_contextual_choices_content(choices),
+        metadata=ArtifactMetadata(
+            clarifier_asked=False,
+            internal_candidate_count=len(choices),
+            selected_option=None,
+        ),
+        choices=choices,
+    )
+
+
+def build_receive_concrete_anchor_prompt(user_input: str) -> str:
+    world_name = _selected_symbolic_world_name(user_input)
+    if world_name == "Natureza":
+        return (
+            "Boa. Para seguir por natureza, me dê uma imagem concreta: raiz, semente, tronco, rio, pedra ou vento. "
+            "Qual aparece primeiro na sua cena?"
+        )
+    if world_name == "Guerra / estratégia":
+        return (
+            "Boa. Para seguir por guerra / estratégia, me dê uma cena concreta: muralha, ataque, fronteira, trincheira "
+            "ou cerco. Qual aparece primeiro?"
+        )
+    if world_name == "Jornada / viagem":
+        return (
+            "Boa. Para seguir por jornada / viagem, me dê uma imagem concreta: trilha, ponte, mapa, desvio, travessia "
+            "ou estação. Qual aparece primeiro?"
+        )
+    if world_name == "Máquina / engenharia":
+        return (
+            "Boa. Para seguir por máquina / engenharia, me dê uma imagem concreta: "
+            "engrenagem, alavanca, motor, painel, válvula ou parafuso. "
+            "Qual aparece primeiro?"
+        )
+    if world_name == "Energia / física":
+        return (
+            "Boa. Para seguir por energia / física, me dê uma imagem concreta: pressão, faísca, calor, peso, corrente "
+            "ou choque. Qual aparece primeiro?"
+        )
+
+    return "Boa. Agora me dê uma imagem concreta dessa cena: um objeto, uma paisagem, um mecanismo ou um som."
+
+
+def has_receive_concrete_anchor(user_input: str) -> bool:
+    substantive_lines = _collect_substantive_user_lines(user_input)
+    return len(substantive_lines) >= 2
 
 
 def interpret_turn(provider: ChatProvider, current_state: str, user_input: str) -> TurnInterpretation:
@@ -77,7 +170,7 @@ def generate_receive_choices(provider: ChatProvider, user_input: str) -> Artifac
 
 def generate_contextual_choices(provider: ChatProvider, user_input: str) -> ArtifactView:
     raw_output = provider.invoke_chat(RECEIVE_CONTEXTUAL_PROMPT, user_input)
-    choices = _parse_receive_choices(raw_output) or _fallback_receive_choices(user_input)
+    choices = _parse_receive_choices(raw_output) or _fallback_contextual_choices()
     return ArtifactView(
         artifact_type="receive_choice",
         content=_format_contextual_choices_content(choices),
@@ -96,7 +189,11 @@ def hydrate_receive_choice_artifact(
 ) -> ArtifactView:
     choices = _parse_receive_choices(content)
     if choices is None:
-        choices = _fallback_receive_choices(content)
+        choices = (
+            _fallback_contextual_choices()
+            if _is_contextual_choice_content(content)
+            else _fallback_receive_choices(content)
+        )
 
     metadata_model = ArtifactMetadata.model_validate(metadata or {})
     return ArtifactView(
@@ -104,6 +201,15 @@ def hydrate_receive_choice_artifact(
         content=content if _is_contextual_choice_content(content) else _format_receive_choices_content(choices),
         metadata=metadata_model,
         choices=choices,
+    )
+
+
+def hydrate_receive_final_comparison_artifact(content: str) -> ArtifactView:
+    variants = _parse_final_comparison_content(content)
+    return ArtifactView(
+        artifact_type="receive_final_comparison",
+        content=content,
+        comparison_variants=variants,
     )
 
 
@@ -129,13 +235,33 @@ def _parse_receive_choices(raw_output: str) -> list[MetaphorChoice] | None:
 def _normalize_choice_text(text: str) -> str:
     compact = " ".join(line.strip() for line in text.strip().splitlines() if line.strip())
     compact = re.sub(r"\s+", " ", compact)
-    compact = re.sub(r"\s*Escolha\s+A,\s*B\s+ou\s+C\.?\s*$", "", compact, flags=re.IGNORECASE)
+    compact = re.sub(r"\s*Escolha\s+[A-E](?:,\s*[A-E])*(?:\s+ou\s+[A-E])?\.?\s*$", "", compact, flags=re.IGNORECASE)
     return compact.strip(" -")
+
+
+def _format_final_comparison_content(variants: list[FinalMetaphorVariant]) -> str:
+    return json.dumps([variant.model_dump() for variant in variants], ensure_ascii=False)
+
+
+def _parse_final_comparison_content(content: str) -> list[FinalMetaphorVariant]:
+    try:
+        payload = json.loads(content)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(payload, list):
+        return []
+    variants: list[FinalMetaphorVariant] = []
+    for item in payload:
+        if isinstance(item, dict):
+            try:
+                variants.append(FinalMetaphorVariant.model_validate(item))
+            except Exception:
+                continue
+    return variants
 
 
 def _fallback_receive_choices(user_input: str) -> list[MetaphorChoice]:
     problem = _latest_user_problem(user_input).rstrip(".!?")
-    scene = problem or "isso"
     normalized_problem = problem.lower()
 
     if _has_sea_metaphor_language(normalized_problem):
@@ -150,24 +276,26 @@ def _fallback_receive_choices(user_input: str) -> list[MetaphorChoice]:
             MetaphorChoice(label="A", text="Como um corredor estreito entupido de caixas."),
             MetaphorChoice(label="B", text="Como um motor que gira e nao engata."),
             MetaphorChoice(label="C", text="Como agua presa atras de uma comporta."),
+            MetaphorChoice(label="D", text="Como uma corrente segurando o avanço no meio da travessia."),
+            MetaphorChoice(label="E", text="Como pressão acumulada sem uma válvula de escape."),
         ]
 
     return [
-        MetaphorChoice(
-            label="A",
-            text=f"Como um carro girando em falso na lama: faz força demais e ainda assim não sai do lugar em {scene}.",
-        ),
-        MetaphorChoice(
-            label="B",
-            text=f"Como uma gaveta emperrada: você puxa, hesita, solta, e tudo fica preso no meio em {scene}.",
-        ),
-        MetaphorChoice(
-            label="C",
-            text=(
-                "Como três rádios ligados ao mesmo tempo: sinais disputam espaço "
-                f"e nenhuma música consegue abrir caminho em {scene}."
-            ),
-        ),
+        MetaphorChoice(label="A", text="Natureza: plantio, colheita, raiz, crescimento."),
+        MetaphorChoice(label="B", text="Guerra / estratégia: batalha, território, ataque, defesa."),
+        MetaphorChoice(label="C", text="Jornada / viagem: caminho, mapa, destino."),
+        MetaphorChoice(label="D", text="Máquina / engenharia: sistema, engrenagem, processo."),
+        MetaphorChoice(label="E", text="Energia / física: calor, pressão, força."),
+    ]
+
+
+def _fallback_contextual_choices() -> list[MetaphorChoice]:
+    return [
+        MetaphorChoice(label="A", text="Natureza: plantio, colheita, raiz, crescimento."),
+        MetaphorChoice(label="B", text="Guerra / estratégia: batalha, território, ataque, defesa."),
+        MetaphorChoice(label="C", text="Jornada / viagem: caminho, mapa, destino."),
+        MetaphorChoice(label="D", text="Máquina / engenharia: sistema, engrenagem, processo."),
+        MetaphorChoice(label="E", text="Energia / física: calor, pressão, força."),
     ]
 
 
@@ -229,8 +357,16 @@ def _fallback_turn_interpretation(user_input: str) -> TurnInterpretation:
     )
 
 
-def should_finalize_receive_response(current_state: str, user_input: str, interpretation: TurnInterpretation) -> bool:
+def should_finalize_receive_response(
+    current_state: str,
+    user_input: str,
+    interpretation: TurnInterpretation,
+    receive_llm_question_count: int,
+) -> bool:
     if current_state != "refine_selected":
+        return False
+
+    if receive_llm_question_count < 3:
         return False
 
     if interpretation.intent in {"agent_option_selection", "refinement_request", "ambiguous"}:
@@ -261,6 +397,7 @@ def _is_ambiguous_reply(normalized: str) -> bool:
 
 
 def _is_refinement_request(normalized: str) -> bool:
+    normalized = normalized.strip().rstrip(".!?")
     direct_markers = {
         "mais curta",
         "mais curto",
@@ -299,6 +436,13 @@ def _collect_substantive_user_lines(user_input: str) -> list[str]:
             continue
         substantive.append(line)
     return substantive
+
+
+def _selected_symbolic_world_name(user_input: str) -> str | None:
+    match = re.search(r"selected_symbolic_world_name:\s*(.+)", user_input, flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return None
 
 
 def _looks_like_user_metaphor(normalized: str) -> bool:
@@ -373,18 +517,22 @@ def _has_sea_metaphor_language(normalized: str) -> bool:
 
 def _is_contextual_choice_content(content: str) -> bool:
     lowered = content.lower()
-    return "aqui vao tres possibilidades" in lowered and "escolha a imagem" not in lowered
+    return (
+        "em qual desses mundos isso se encaixa" in lowered
+        or "para achar sua metáfora" in lowered
+        or "para achar sua metafora" in lowered
+        or ("aqui vao tres possibilidades" in lowered and "escolha a imagem" not in lowered)
+    )
 
 
 def _format_receive_choices_content(choices: list[MetaphorChoice]) -> str:
     lines = ["Escolha a imagem que mais acerta o problema agora:"]
     lines.extend(f"{choice.label}. {choice.text}" for choice in choices)
-    lines.append("Escolha A, B ou C.")
+    lines.append("Escolha uma opção para eu desenvolver.")
     return "\n".join(lines)
 
 
 def _format_contextual_choices_content(choices: list[MetaphorChoice]) -> str:
-    lines = ["Aqui vao tres possibilidades para seguir nessa imagem:"]
+    lines = ["Em qual desses mundos isso se encaixa?"]
     lines.extend(f"{choice.label}. {choice.text}" for choice in choices)
-    lines.append("Se alguma acertar, eu desenvolvo por esse caminho.")
     return "\n".join(lines)

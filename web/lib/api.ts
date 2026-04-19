@@ -37,16 +37,24 @@ export class AgentRequestError extends Error {
 }
 
 export const RECEIVE_CHOICE_ARTIFACT_TYPE = "receive_choice";
+export const RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE = "receive_final_comparison";
 
 export type MetaphorChoice = {
-  label: "A" | "B" | "C";
+  label: "A" | "B" | "C" | "D" | "E";
   text: string;
 };
 
 export type ArtifactMetadata = {
   clarifier_asked: boolean;
   internal_candidate_count: number;
-  selected_option: "A" | "B" | "C" | null;
+  selected_option: "A" | "B" | "C" | "D" | "E" | null;
+};
+
+export type FinalMetaphorVariant = {
+  style: string;
+  title: string;
+  status: string;
+  text: string;
 };
 
 type BaseChatArtifact = {
@@ -54,6 +62,7 @@ type BaseChatArtifact = {
   content: string;
   metadata: ArtifactMetadata | null;
   choices: MetaphorChoice[];
+  comparison_variants?: FinalMetaphorVariant[];
 };
 
 export type ReceiveChoiceArtifact = {
@@ -63,10 +72,38 @@ export type ReceiveChoiceArtifact = {
   choices: MetaphorChoice[];
 };
 
-export type ChatArtifact = ReceiveChoiceArtifact | BaseChatArtifact;
+export type ReceiveFinalComparisonArtifact = {
+  artifact_type: typeof RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE;
+  content: string;
+  metadata: null;
+  choices: [];
+  comparison_variants: FinalMetaphorVariant[];
+};
+
+export type ChatArtifact = ReceiveChoiceArtifact | ReceiveFinalComparisonArtifact | BaseChatArtifact;
 
 export function isReceiveChoiceArtifact(artifact: ChatArtifact): artifact is ReceiveChoiceArtifact {
   return artifact.artifact_type === RECEIVE_CHOICE_ARTIFACT_TYPE && artifact.choices.length > 0;
+}
+
+export function isReceiveFinalComparisonArtifact(
+  artifact: ChatArtifact,
+): artifact is ReceiveFinalComparisonArtifact {
+  return (
+    artifact.artifact_type === RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE &&
+    "comparison_variants" in artifact &&
+    Array.isArray(artifact.comparison_variants) &&
+    artifact.comparison_variants.length > 0
+  );
+}
+
+export function hasPendingFinalComparison(session: Pick<GuidedSessionView, "artifacts">) {
+  const comparisonArtifact = [...session.artifacts].reverse().find(isReceiveFinalComparisonArtifact);
+  if (!comparisonArtifact) {
+    return false;
+  }
+
+  return comparisonArtifact.comparison_variants.some((variant) => variant.status === "pending");
 }
 
 export type SessionStartResponse = {
@@ -147,6 +184,7 @@ const SUGGESTIONS_BY_MODE_AND_STATE: Record<ChatMode, Record<string, string[]>> 
       "Prefiro uma imagem mais simples.",
     ],
     generate_metaphor: ["Mais curto.", "Mais concreto.", "Mais suave."],
+    refine_selected: ["Mais curta.", "Mais concreta.", "Mais poética.", "Mais direta."],
     refine_output: ["Mais curto.", "Mais prático.", "Troque a imagem central."],
   },
   build: {
@@ -156,12 +194,26 @@ const SUGGESTIONS_BY_MODE_AND_STATE: Record<ChatMode, Record<string, string[]>> 
       "Tenho uma ideia, mas ela fica confusa.",
     ],
     identify_core_conflict: ["Desejo versus medo.", "Pressa versus clareza.", "Controle versus espontaneidade."],
-    offer_symbolic_fields: ["Um macaco bagunceiro.", "Um motor acelerado.", "Uma bússola girando."],
-    user_selects_symbol: ["Um macaco bagunceiro.", "Um motor acelerado.", "Uma porta emperrada."],
+    offer_symbolic_fields: [
+      "Natureza: plantio, colheita, raiz, crescimento.",
+      "Guerra / estratégia: batalha, território, ataque, defesa.",
+      "Jornada / viagem: caminho, mapa, destino.",
+      "Máquina / engenharia: sistema, engrenagem, processo.",
+      "Energia / física: calor, pressão, força.",
+    ],
+    user_selects_symbol: [
+      "Quero ir por natureza.",
+      "Quero ir por guerra / estratégia.",
+      "Quero ir por jornada / viagem.",
+      "Quero ir por máquina / engenharia.",
+      "Quero ir por energia / física.",
+    ],
     user_attempt: [
-      "Parece um macaco que aparece e quer estragar tudo.",
-      "Parece um motor acelerado sem direção.",
-      "Parece uma porta que eu forço e ela trava mais.",
+      "Isso parece uma raiz tentando firmar espaço em chão ruim.",
+      "Isso parece uma batalha em que eu gasto energia cedo demais.",
+      "Isso parece um caminho sem mapa claro.",
+      "Isso parece um sistema rodando, mas sem encaixar direito.",
+      "Isso parece pressão acumulando sem virar movimento.",
     ],
     coach_feedback: ["Quero deixar mais concreto.", "Quero menos clichê.", "Quero mais movimento."],
     rewrite_together: ["Mais curto.", "Mais estranho.", "Mais claro."],
@@ -174,7 +226,11 @@ export function normalizeMode(mode: string | string[] | undefined): ChatMode {
 }
 
 function getAgentUnavailableError() {
-  return new Error(`Agent service is unavailable. Verify it is running at ${DEFAULT_AGENT_BASE_URL}.`);
+  return new Error("Não consegui falar com o serviço do chat agora. Tente novamente em instantes.");
+}
+
+function getAgentTimeoutError() {
+  return new Error("O serviço do chat demorou demais para responder. Tente novamente.");
 }
 
 async function parseResponseBody(response: Response) {
@@ -219,9 +275,7 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
     return payload as T;
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error(
-        `Agent service timed out after ${REQUEST_TIMEOUT_MS}ms. Verify it is running at ${DEFAULT_AGENT_BASE_URL}.`,
-      );
+      throw getAgentTimeoutError();
     }
 
     if (error instanceof TypeError) {

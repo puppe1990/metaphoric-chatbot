@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getGuidedSessionView,
   RECEIVE_CHOICE_ARTIFACT_TYPE,
+  RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE,
   getSession,
   sendMessage,
   startSession,
@@ -108,6 +109,39 @@ describe("api helpers", () => {
     });
   });
 
+  it("carries final comparison artifacts through the guided session view", () => {
+    expect(
+      getGuidedSessionView({
+        token: "tok_compare",
+        mode: "receive",
+        state: "refine_selected",
+        messages: [{ role: "assistant", content: "Aqui estão duas leituras finais do mesmo núcleo metafórico." }],
+        artifacts: [
+          {
+            artifact_type: RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE,
+            content: "[]",
+            metadata: null,
+            choices: [],
+            comparison_variants: [
+              { style: "erickson", title: "Erickson / insinuante", text: "Primeira versão" },
+              { style: "bandler", title: "Bandler / cinematográfica", text: "Segunda versão" },
+            ],
+          },
+        ],
+      }),
+    ).toMatchObject({
+      artifacts: [
+        {
+          artifact_type: RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE,
+          comparison_variants: [
+            { title: "Erickson / insinuante", text: "Primeira versão" },
+            { title: "Bandler / cinematográfica", text: "Segunda versão" },
+          ],
+        },
+      ],
+    });
+  });
+
   it("uses state-specific answer suggestions instead of generic questions", () => {
     expect(
       getGuidedSessionView({
@@ -134,13 +168,40 @@ describe("api helpers", () => {
         "Sei o que quero, mas fico adiando.",
       ],
     });
+
+    expect(
+      getGuidedSessionView({
+        token: "tok_live",
+        mode: "receive",
+        state: "refine_selected",
+        messages: [
+          {
+            role: "assistant",
+            content: "Boa. Agora diga como você quer ajustar essa opção: mais curta, mais concreta, mais poética ou mais direta.",
+          },
+        ],
+      }),
+    ).toMatchObject({
+      suggestions: ["Mais curta.", "Mais concreta.", "Mais poética.", "Mais direta."],
+    });
   });
 
   it("surfaces a clear error when the agent service is unavailable", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new TypeError("fetch failed")));
 
     await expect(getSession("tok_missing")).rejects.toThrow(
-      "Agent service is unavailable. Verify it is running at http://localhost:8000.",
+      "Não consegui falar com o serviço do chat agora. Tente novamente em instantes.",
+    );
+  });
+
+  it("surfaces a localized timeout error when the agent service takes too long", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValueOnce(new DOMException("The operation was aborted.", "AbortError")),
+    );
+
+    await expect(getSession("tok_timeout")).rejects.toThrow(
+      "O serviço do chat demorou demais para responder. Tente novamente.",
     );
   });
 

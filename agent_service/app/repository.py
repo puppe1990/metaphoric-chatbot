@@ -18,6 +18,7 @@ SESSION_CONTEXT_FIELDS = {
     "last_user_intent",
     "sensory_mode",
     "suggestion_basis",
+    "receive_llm_question_count",
 }
 
 

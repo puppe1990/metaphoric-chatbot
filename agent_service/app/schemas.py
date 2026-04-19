@@ -13,15 +13,25 @@ TurnIntent = Literal[
 ]
 
 
+ChoiceLabel = Literal["A", "B", "C", "D", "E"]
+
+
 class MetaphorChoice(BaseModel):
-    label: Literal["A", "B", "C"]
+    label: ChoiceLabel
     text: str = Field(min_length=1)
 
 
 class ArtifactMetadata(BaseModel):
     clarifier_asked: bool = False
     internal_candidate_count: int = 0
-    selected_option: Literal["A", "B", "C"] | None = None
+    selected_option: ChoiceLabel | None = None
+
+
+class FinalMetaphorVariant(BaseModel):
+    style: str
+    title: str
+    status: str = "complete"
+    text: str = ""
 
 
 class ArtifactView(BaseModel):
@@ -29,6 +39,7 @@ class ArtifactView(BaseModel):
     content: str
     metadata: ArtifactMetadata | None = None
     choices: list[MetaphorChoice] = Field(default_factory=list)
+    comparison_variants: list[FinalMetaphorVariant] = Field(default_factory=list)
 
 
 class SessionContextUpdate(BaseModel):
@@ -36,6 +47,7 @@ class SessionContextUpdate(BaseModel):
     last_user_intent: TurnIntent | None = None
     sensory_mode: str | None = None
     suggestion_basis: str | None = None
+    receive_llm_question_count: int | None = None
 
 
 class StartSessionRequest(BaseModel):

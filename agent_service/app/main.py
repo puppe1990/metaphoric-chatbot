@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
+from threading import Lock
 
-from app.agents import hydrate_receive_choice_artifact
+from app.agents import (
+    hydrate_receive_choice_artifact,
+    hydrate_receive_final_comparison_artifact,
+)
 from app.config import get_allowed_origins, load_environment_file
 from app.db import SessionLocal, init_db
 from app.models import ArtifactRecord, MessageRecord, SessionRecord, SettingRecord
@@ -23,7 +29,17 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-RECEIVE_SELECTIONS = {"A", "B", "C"}
+FINAL_COMPARISON_EXECUTOR = ThreadPoolExecutor(max_workers=4)
+FINAL_COMPARISON_ARTIFACT_LOCK = Lock()
+
+RECEIVE_SELECTIONS = {"A", "B", "C", "D", "E"}
+SYMBOLIC_WORLD_BY_LABEL = {
+    "A": "Natureza",
+    "B": "Guerra / estratégia",
+    "C": "Jornada / viagem",
+    "D": "Máquina / engenharia",
+    "E": "Energia / física",
+}
 
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",
@@ -205,6 +221,8 @@ def _artifact_record_to_view(artifact: ArtifactRecord) -> ArtifactView:
     metadata = artifact.get_metadata()
     if artifact.artifact_type == "receive_choice":
         return hydrate_receive_choice_artifact(artifact.content, metadata)
+    if artifact.artifact_type == "receive_final_comparison":
+        return hydrate_receive_final_comparison_artifact(artifact.content)
 
     return ArtifactView(
         artifact_type=artifact.artifact_type,
@@ -246,6 +264,79 @@ def _build_provider(provider: str, model: str) -> ChatProvider:
         return LocalProvider()
 
 
+def _update_receive_final_variant(artifact_id: int, *, style: str, status: str, text: str) -> None:
+    with FINAL_COMPARISON_ARTIFACT_LOCK:
+        session = SessionLocal()
+        try:
+            artifact = session.query(ArtifactRecord).filter(ArtifactRecord.id == artifact_id).one()
+            content = artifact.content
+            try:
+                payload = json.loads(content)
+            except json.JSONDecodeError:
+                payload = []
+            if not isinstance(payload, list):
+                payload = []
+
+            for item in payload:
+                if isinstance(item, dict) and item.get("style") == style:
+                    item["status"] = status
+                    item["text"] = text
+                    break
+
+            artifact.content = json.dumps(payload, ensure_ascii=False)
+            session.add(artifact)
+            session.commit()
+        finally:
+            session.close()
+
+
+def _generate_receive_final_variant(
+    artifact_id: int,
+    *,
+    style: str,
+    prompt: str,
+    user_input: str,
+    config: ProviderConfig,
+) -> None:
+    try:
+        provider = _build_provider(config.provider, config.model)
+        text = provider.invoke_chat(prompt, user_input)
+        _update_receive_final_variant(artifact_id, style=style, status="complete", text=text)
+    except Exception:
+        _update_receive_final_variant(
+            artifact_id,
+            style=style,
+            status="error",
+            text="Não consegui gerar esta variação agora.",
+        )
+
+
+def _spawn_receive_final_comparison_generation(
+    artifact_id: int,
+    *,
+    user_input: str,
+    config: ProviderConfig,
+) -> None:
+    from app.prompts import RECEIVE_FINAL_BANDLER_PROMPT, RECEIVE_FINAL_ERICKSON_PROMPT
+
+    FINAL_COMPARISON_EXECUTOR.submit(
+        _generate_receive_final_variant,
+        artifact_id,
+        style="erickson",
+        prompt=RECEIVE_FINAL_ERICKSON_PROMPT,
+        user_input=user_input,
+        config=config,
+    )
+    FINAL_COMPARISON_EXECUTOR.submit(
+        _generate_receive_final_variant,
+        artifact_id,
+        style="bandler",
+        prompt=RECEIVE_FINAL_BANDLER_PROMPT,
+        user_input=user_input,
+        config=config,
+    )
+
+
 def create_provider() -> ChatProvider:
     return _build_provider("groq", "llama-3.3-70b-versatile")
 
@@ -255,14 +346,51 @@ def resolve_provider(db) -> ChatProvider:
     return _build_provider(cfg.provider, cfg.model)
 
 
-def build_contextual_user_input(messages: list[MessageRecord], content: str) -> str:
+def _get_selected_symbolic_world_context(artifacts: list[ArtifactRecord]) -> str:
+    latest_receive_choice_artifact = next(
+        (artifact for artifact in reversed(artifacts) if artifact.artifact_type == "receive_choice"),
+        None,
+    )
+    if latest_receive_choice_artifact is None:
+        return ""
+
+    metadata = latest_receive_choice_artifact.get_metadata() or {}
+    selected_option = metadata.get("selected_option")
+    if not isinstance(selected_option, str):
+        return ""
+
+    world_name = SYMBOLIC_WORLD_BY_LABEL.get(selected_option)
+    if world_name is None:
+        return ""
+
+    artifact_view = _artifact_record_to_view(latest_receive_choice_artifact)
+    selected_choice = next((choice for choice in artifact_view.choices if choice.label == selected_option), None)
+    selected_choice_text = selected_choice.text if selected_choice is not None else ""
+
+    context_lines = [
+        f"selected_symbolic_world_label: {selected_option}",
+        f"selected_symbolic_world_name: {world_name}",
+    ]
+    if selected_choice_text:
+        context_lines.append(f"selected_symbolic_world_description: {selected_choice_text}")
+    return "\n".join(context_lines)
+
+
+def build_contextual_user_input(
+    messages: list[MessageRecord],
+    content: str,
+    artifacts: list[ArtifactRecord] | None = None,
+) -> str:
     transcript = "\n".join(
         f"{message.role}: {message.content}" for message in messages if message.role in {"assistant", "user"}
     )
-    if not transcript:
-        return content
+    symbolic_world_context = _get_selected_symbolic_world_context(artifacts or [])
 
-    return f"{transcript}\nuser: {content}"
+    if not transcript:
+        return f"{symbolic_world_context}\nuser: {content}".strip() if symbolic_world_context else content
+
+    context_prefix = f"{symbolic_world_context}\n" if symbolic_world_context else ""
+    return f"{context_prefix}{transcript}\nuser: {content}"
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
@@ -354,6 +482,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         repo = SessionRepository(db)
         session = get_session_or_404(db, payload.token)
         existing_messages = list_session_messages(db, session.id)
+        existing_artifacts = list_session_artifacts(db, session.id)
         provider_config = _load_provider_config(db)
 
         prior_state = session.state
@@ -366,8 +495,9 @@ def create_app(database_url: str | None = None) -> FastAPI:
             resolved_state, assistant_message, artifacts, interpretation = build_assistant_message(
                 mode=session.mode,
                 state=state_for_response,
-                user_input=build_contextual_user_input(existing_messages, content),
+                user_input=build_contextual_user_input(existing_messages, content, existing_artifacts),
                 provider_factory=lambda: resolve_provider(db),
+                receive_llm_question_count=session.receive_llm_question_count,
             )
         except Exception as exc:
             raise _translate_provider_exception(exc, provider_config) from exc
@@ -391,6 +521,16 @@ def create_app(database_url: str | None = None) -> FastAPI:
                 session_context["sensory_mode"] = interpretation.sensory_mode
             if interpretation.suggestion_basis is not None:
                 session_context["suggestion_basis"] = interpretation.suggestion_basis
+            if interpretation.assistant_response_kind == "receive_llm_question":
+                session_context["receive_llm_question_count"] = session.receive_llm_question_count + 1
+            elif interpretation.assistant_response_kind in {
+                "receive_refinement_prompt",
+                "receive_symbolic_world_prompt",
+                "receive_concrete_anchor_prompt",
+                "receive_llm_final",
+                "receive_llm_final_pending",
+            }:
+                session_context["receive_llm_question_count"] = 0
             repo.update_session_context(
                 session_id=session.id,
                 context=session_context,
@@ -419,15 +559,28 @@ def create_app(database_url: str | None = None) -> FastAPI:
                 step=resolved_state,
             )
         )
+        created_artifacts: list[ArtifactRecord] = []
         for artifact in artifacts:
-            repo.create_artifact(
-                session_id=session.id,
-                artifact_type=artifact.artifact_type,
-                content=artifact.content,
-                metadata=artifact.metadata,
+            created_artifacts.append(
+                repo.create_artifact(
+                    session_id=session.id,
+                    artifact_type=artifact.artifact_type,
+                    content=artifact.content,
+                    metadata=artifact.metadata,
+                )
             )
         db.commit()
         db.refresh(session)
+
+        if interpretation is not None and interpretation.assistant_response_kind == "receive_llm_final_pending":
+            for artifact in created_artifacts:
+                if artifact.artifact_type == "receive_final_comparison":
+                    _spawn_receive_final_comparison_generation(
+                        artifact.id,
+                        user_input=build_contextual_user_input(existing_messages, content, existing_artifacts),
+                        config=provider_config,
+                    )
+                    break
 
         return {
             "token": session.token,
