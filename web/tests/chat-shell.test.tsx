@@ -318,6 +318,107 @@ describe("ChatShell", () => {
     expect(screen.queryByRole("button", { name: "A Uma ponte oscilando no vento." })).toBeNull();
   });
 
+  it("renders refinement suggestions as clickable actions inside the latest assistant message", () => {
+    const session: GuidedSessionView = {
+      token: "tok_refine_actions",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "refine_selected",
+      messages: [
+        { role: "assistant", content: "Escolha a imagem que melhor descreve seu momento." },
+        { role: "user", content: "B" },
+        {
+          role: "assistant",
+          content: "Boa. Agora diga como você quer ajustar essa opção: mais curta, mais concreta, mais poética ou mais direta.",
+        },
+      ],
+      artifacts: [],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: ["Mais curta.", "Mais concreta.", "Mais poética.", "Mais direta."],
+    };
+
+    render(<ChatShell session={session} />);
+
+    const transcriptItems = screen.getAllByRole("listitem");
+    const refinementPrompt = transcriptItems[2];
+
+    expect(within(refinementPrompt).getByRole("button", { name: "Mais curta." })).toBeInTheDocument();
+    expect(within(refinementPrompt).getByRole("button", { name: "Mais concreta." })).toBeInTheDocument();
+    expect(within(refinementPrompt).getByRole("button", { name: "Mais poética." })).toBeInTheDocument();
+    expect(within(refinementPrompt).getByRole("button", { name: "Mais direta." })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mais curta." })).toBeInTheDocument();
+    expect(screen.queryByText("Sua próxima linha")).toBeInTheDocument();
+  });
+
+  it("submits a refinement suggestion through the existing chat form flow", async () => {
+    const submissions: string[] = [];
+    const handleSubmit = vi.fn((event: React.FormEvent<HTMLFormElement>) => {
+      const input = event.currentTarget.querySelector("textarea");
+      submissions.push(input?.value ?? "");
+    });
+
+    const session: GuidedSessionView = {
+      token: "tok_refine_submit",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "refine_selected",
+      messages: [
+        { role: "assistant", content: "Escolha a imagem que melhor descreve seu momento." },
+        { role: "user", content: "B" },
+        {
+          role: "assistant",
+          content: "Boa. Agora diga como você quer ajustar essa opção: mais curta, mais concreta, mais poética ou mais direta.",
+        },
+      ],
+      artifacts: [],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: ["Mais curta.", "Mais concreta.", "Mais poética.", "Mais direta."],
+    };
+
+    render(<ChatShell onInputSubmit={handleSubmit} session={session} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Mais concreta." }));
+
+    await waitFor(() => expect(handleSubmit).toHaveBeenCalledTimes(1));
+    expect(submissions).toEqual(["Mais concreta."]);
+    expect(screen.getByLabelText("Message input")).toHaveValue("");
+  });
+
+  it("hides refinement suggestions when the latest assistant message has already moved to a new question", () => {
+    const session: GuidedSessionView = {
+      token: "tok_refine_followup",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "refine_selected",
+      messages: [
+        { role: "assistant", content: "Escolha a imagem que melhor descreve seu momento." },
+        { role: "user", content: "B" },
+        { role: "user", content: "Mais poética." },
+        {
+          role: "assistant",
+          content:
+            "Então, no mundo A que você escolheu, que elemento concreto (um objeto, uma paisagem ou um som) poderia simbolizar a decisão que ainda está em suspenso?",
+        },
+      ],
+      artifacts: [],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: ["Mais curta.", "Mais concreta.", "Mais poética.", "Mais direta."],
+    };
+
+    render(<ChatShell session={session} />);
+
+    expect(screen.queryByRole("button", { name: "Mais curta." })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mais concreta." })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mais poética." })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Mais direta." })).toBeNull();
+  });
+
   it("submits a receive-choice selection through the existing chat form flow", async () => {
     const submissions: string[] = [];
     const handleSubmit = vi.fn((event: React.FormEvent<HTMLFormElement>) => {

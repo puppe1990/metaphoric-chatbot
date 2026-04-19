@@ -134,6 +134,22 @@ describe("api helpers", () => {
         "Sei o que quero, mas fico adiando.",
       ],
     });
+
+    expect(
+      getGuidedSessionView({
+        token: "tok_live",
+        mode: "receive",
+        state: "refine_selected",
+        messages: [
+          {
+            role: "assistant",
+            content: "Boa. Agora diga como você quer ajustar essa opção: mais curta, mais concreta, mais poética ou mais direta.",
+          },
+        ],
+      }),
+    ).toMatchObject({
+      suggestions: ["Mais curta.", "Mais concreta.", "Mais poética.", "Mais direta."],
+    });
   });
 
   it("surfaces a clear error when the agent service is unavailable", async () => {

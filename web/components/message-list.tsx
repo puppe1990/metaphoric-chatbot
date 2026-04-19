@@ -26,20 +26,26 @@ function findLatestAssistantMessageIndex(messages: ChatMessage[]) {
 export function MessageList({
   artifacts = [],
   disabled = false,
+  inlineSuggestions = [],
   isThinking = false,
   messages,
   onChoiceSelect,
+  onInlineSuggestionSelect,
 }: {
   messages: ChatMessage[];
   artifacts?: ChatArtifact[];
   disabled?: boolean;
+  inlineSuggestions?: string[];
   isThinking?: boolean;
   onChoiceSelect?: (label: "A" | "B" | "C" | "D" | "E") => void;
+  onInlineSuggestionSelect?: (suggestion: string) => void;
 }) {
   const receiveChoiceArtifact = [...artifacts].reverse().find(
     (artifact) => isReceiveChoiceArtifact(artifact) && artifact.metadata?.selected_option == null,
   );
   const receiveChoiceMessageIndex = receiveChoiceArtifact ? findLatestAssistantMessageIndex(messages) : -1;
+  const inlineSuggestionMessageIndex =
+    inlineSuggestions.length > 0 && receiveChoiceArtifact == null ? findLatestAssistantMessageIndex(messages) : -1;
 
   return (
     <ol aria-label="Chat messages" className="space-y-3">
@@ -58,6 +64,21 @@ export function MessageList({
           <p className="whitespace-pre-wrap text-sm leading-6 sm:text-[0.98rem]">{message.content}</p>
           {index === receiveChoiceMessageIndex && receiveChoiceArtifact ? (
             <MetaphorChoiceList choices={receiveChoiceArtifact.choices} disabled={disabled} onSelect={onChoiceSelect} />
+          ) : null}
+          {index === inlineSuggestionMessageIndex ? (
+            <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Refinement suggestions">
+              {inlineSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  className="rounded-lg border border-ink/10 bg-fog px-3 py-1.5 text-left text-xs font-medium text-clay transition-colors hover:border-ink/20 hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={disabled}
+                  onClick={() => onInlineSuggestionSelect?.(suggestion)}
+                  type="button"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           ) : null}
         </li>
       ))}

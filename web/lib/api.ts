@@ -147,6 +147,7 @@ const SUGGESTIONS_BY_MODE_AND_STATE: Record<ChatMode, Record<string, string[]>> 
       "Prefiro uma imagem mais simples.",
     ],
     generate_metaphor: ["Mais curto.", "Mais concreto.", "Mais suave."],
+    refine_selected: ["Mais curta.", "Mais concreta.", "Mais poética.", "Mais direta."],
     refine_output: ["Mais curto.", "Mais prático.", "Troque a imagem central."],
   },
   build: {

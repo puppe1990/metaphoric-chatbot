@@ -40,8 +40,14 @@ export function ChatShell({
   const [draft, setDraft] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
-  const pendingChoiceSubmitRef = useRef<"A" | "B" | "C" | "D" | "E" | null>(null);
+  const pendingSubmissionRef = useRef<string | null>(null);
   const value = inputValue ?? draft;
+  const latestAssistantMessage = [...session.messages].reverse().find((message) => message.role === "assistant")?.content ?? "";
+  const showsRefinementActions =
+    session.progressLabel === "refine_selected" &&
+    latestAssistantMessage.toLowerCase().includes("como você quer ajustar essa opção");
+  const inlineSuggestions = showsRefinementActions ? session.suggestions : [];
+  const inputSuggestions = session.progressLabel === "refine_selected" ? [] : session.suggestions;
 
   const updateValue = (nextValue: string) => {
     if (inputValue === undefined) {
@@ -60,7 +66,7 @@ export function ChatShell({
 
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
-    pendingChoiceSubmitRef.current = null;
+    pendingSubmissionRef.current = null;
     onInputSubmit?.(event);
 
     if (inputValue === undefined) {
@@ -73,22 +79,31 @@ export function ChatShell({
       return;
     }
 
-    pendingChoiceSubmitRef.current = label;
+    pendingSubmissionRef.current = label;
     updateValue(label);
   };
 
+  const handleInlineSuggestionSelect = (suggestion: string) => {
+    if (inputDisabled) {
+      return;
+    }
+
+    pendingSubmissionRef.current = suggestion;
+    updateValue(suggestion);
+  };
+
   useEffect(() => {
-    const pendingChoice = pendingChoiceSubmitRef.current;
-    if (pendingChoice == null) {
+    const pendingSubmission = pendingSubmissionRef.current;
+    if (pendingSubmission == null) {
       return;
     }
 
-    if (inputDisabled || value !== pendingChoice) {
-      pendingChoiceSubmitRef.current = null;
+    if (inputDisabled || value !== pendingSubmission) {
+      pendingSubmissionRef.current = null;
       return;
     }
 
-    pendingChoiceSubmitRef.current = null;
+    pendingSubmissionRef.current = null;
     formRef.current?.requestSubmit();
   }, [inputDisabled, value]);
 
@@ -146,9 +161,11 @@ export function ChatShell({
               <MessageList
                 artifacts={session.artifacts}
                 disabled={inputDisabled}
+                inlineSuggestions={inlineSuggestions}
                 isThinking={isThinking}
                 messages={session.messages}
                 onChoiceSelect={handleChoiceSelect}
+                onInlineSuggestionSelect={handleInlineSuggestionSelect}
               />
             </div>
           </div>
@@ -170,7 +187,7 @@ export function ChatShell({
                     ? "Ex.: isso parece mais raiz, batalha, caminho, engrenagem ou pressão..."
                     : "Ex.: o projeto trava quando precisa decidir..."
                 }
-                suggestions={session.suggestions}
+                suggestions={inputSuggestions}
                 value={value}
               />
             </div>
