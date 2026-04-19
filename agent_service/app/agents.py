@@ -6,7 +6,6 @@ from .prompts import COACH_PROMPT, EXTRACTOR_PROMPT, GENERATOR_PROMPT, RECEIVE_C
 from .providers.base import ChatProvider
 from .schemas import ArtifactMetadata, ArtifactView, MetaphorChoice
 
-
 CHOICE_LABELS = ("A", "B", "C")
 CHOICE_PATTERN = re.compile(
     r"(?ims)^\s*([ABC])\s*[\.\):-]\s*(.+?)(?=^\s*[ABC]\s*[\.\):-]\s*|\Z)"
@@ -101,7 +100,10 @@ def _fallback_receive_choices(user_input: str) -> list[MetaphorChoice]:
         ),
         MetaphorChoice(
             label="C",
-            text=f"Como três rádios ligados ao mesmo tempo: sinais disputam espaço e nenhuma música consegue abrir caminho em {scene}.",
+            text=(
+                "Como três rádios ligados ao mesmo tempo: sinais disputam espaço "
+                f"e nenhuma música consegue abrir caminho em {scene}."
+            ),
         ),
     ]
 

@@ -67,7 +67,8 @@ class LocalProvider:
             "Escolha a imagem que mais acerta o problema agora:\n"
             f"A. Como um carro girando em falso na lama: faz barulho, força o motor, mas não sai do lugar em {scene}.\n"
             f"B. Como uma gaveta emperrada: você puxa, hesita, solta, e tudo fica preso no meio em {scene}.\n"
-            f"C. Como três rádios ligados ao mesmo tempo: sinais disputam espaço e nenhuma música consegue abrir caminho em {scene}.\n"
+            "C. Como três rádios ligados ao mesmo tempo: sinais disputam espaço "
+            f"e nenhuma música consegue abrir caminho em {scene}.\n"
             "Escolha A, B ou C."
         )
 

@@ -17,7 +17,8 @@ class GroqProvider:
             )
         except (ModuleNotFoundError, ImportError) as exc:
             raise RuntimeError(
-                "Groq support is unavailable. Install the `langchain-groq` integration package and the agent_service dependencies before creating GroqProvider."
+                "Groq support is unavailable. Install the `langchain-groq` integration "
+                "package and the agent_service dependencies before creating GroqProvider."
             ) from exc
         except Exception as exc:
             if not api_key:

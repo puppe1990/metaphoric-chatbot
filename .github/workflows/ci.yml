@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  agent-service:
+    name: Agent Service
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent_service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync dependencies
+        run: uv sync --extra test --extra lint --frozen
+
+      - name: Run lint
+        run: uv run ruff check .
+
+      - name: Run tests
+        run: uv run pytest
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run lint if available
+        run: |
+          if node -e "const pkg=require('./package.json'); process.exit(pkg.scripts?.lint ? 0 : 1)"; then
+            npm run lint
+          else
+            echo "No lint script found, skipping."
+          fi
+
+      - name: Run typecheck if available
+        run: |
+          if node -e "const pkg=require('./package.json'); process.exit(pkg.scripts?.typecheck ? 0 : 1)"; then
+            npm run typecheck
+          else
+            echo "No typecheck script found, skipping."
+          fi
+
+      - name: Build app
+        run: npm run build

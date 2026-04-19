@@ -3,11 +3,9 @@ from __future__ import annotations
 import secrets
 from collections.abc import Mapping
 
-from sqlalchemy.exc import IntegrityError
-
 from app.models import ArtifactRecord, SessionRecord
 from app.schemas import ArtifactMetadata
-
+from sqlalchemy.exc import IntegrityError
 
 DEFAULT_STATE_BY_MODE = {
     "receive": "intake_problem",

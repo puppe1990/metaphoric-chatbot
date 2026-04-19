@@ -9,7 +9,6 @@ from app.agents import (
 from app.schemas import ArtifactView
 from app.state_machine import next_state
 
-
 START_PROMPT_BY_MODE = {
     "receive": "Descreva o problema em uma frase simples.",
     "build": "Descreva o problema em uma frase simples.",
@@ -53,7 +52,8 @@ def build_assistant_message(
         if state == "offer_symbolic_fields":
             return (
                 state,
-                "Isso parece mais uma porta emperrada, um rio barrado, uma engrenagem presa, um motor acelerado ou uma bússola girando?",
+                "Isso parece mais uma porta emperrada, um rio barrado, uma engrenagem "
+                "presa, um motor acelerado ou uma bússola girando?",
                 [],
             )
         if state in {"user_selects_symbol", "user_attempt", "coach_feedback", "rewrite_together"}:

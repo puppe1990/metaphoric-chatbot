@@ -1,5 +1,4 @@
 import pytest
-
 from app.state_machine import FLOW, next_state
 
 

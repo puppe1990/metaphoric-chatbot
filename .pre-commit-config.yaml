@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: agent-service-lint
+        name: agent_service ruff
+        entry: bash -c 'cd agent_service && uv run --extra lint ruff check .'
+        language: system
+        pass_filenames: false
+        files: ^agent_service/
+
+      - id: agent-service-tests
+        name: agent_service pytest
+        entry: bash -c 'cd agent_service && uv run pytest'
+        language: system
+        pass_filenames: false
+        files: ^agent_service/
+
+      - id: web-tests
+        name: web vitest
+        entry: bash -c 'cd web && npm test'
+        language: system
+        pass_filenames: false
+        files: ^web/

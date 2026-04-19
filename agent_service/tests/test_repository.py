@@ -1,9 +1,8 @@
-from pydantic import ValidationError
-
 from app.db import SessionLocal, init_db
 from app.models import ArtifactRecord, SessionRecord
 from app.repository import SessionRepository
 from app.schemas import ArtifactMetadata
+from pydantic import ValidationError
 
 
 def test_create_session_persists_defaults(tmp_path):

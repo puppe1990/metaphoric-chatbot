@@ -4,13 +4,10 @@ from collections.abc import Generator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-
+from app.agents import hydrate_receive_choice_artifact
 from app.config import get_allowed_origins, load_environment_file
 from app.db import SessionLocal, init_db
 from app.models import ArtifactRecord, MessageRecord, SessionRecord
-from app.agents import hydrate_receive_choice_artifact
 from app.orchestrator import (
     REFINE_SELECTED_MESSAGE,
     advance_mode,
@@ -22,6 +19,8 @@ from app.providers.groq_provider import GroqProvider
 from app.providers.local_provider import LocalProvider
 from app.repository import SessionRepository
 from app.schemas import ArtifactView, ChatResponse, MessageRequest, StartSessionRequest
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 RECEIVE_SELECTIONS = {"A", "B", "C"}
 
@@ -95,13 +94,15 @@ def _artifact_record_to_view(artifact: ArtifactRecord) -> ArtifactView:
 def create_provider() -> ChatProvider:
     try:
         return GroqProvider()
-    except RuntimeError as exc:
+    except RuntimeError:
         return LocalProvider()
 
 
 def build_contextual_user_input(messages: list[MessageRecord], content: str) -> str:
     transcript = "\n".join(
-        f"{message.role}: {message.content}" for message in messages if message.role in {"assistant", "user"}
+        f"{message.role}: {message.content}"
+        for message in messages
+        if message.role in {"assistant", "user"}
     )
     if not transcript:
         return content

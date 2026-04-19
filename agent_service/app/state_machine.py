@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Final
 
-
 FLOW: Final[dict[str, dict[str, str]]] = {
     "receive": {
         "intake_problem": "generate_candidates",

@@ -1,7 +1,6 @@
-from fastapi.testclient import TestClient
-
 from app.main import create_app
 from app.orchestrator import build_assistant_message
+from fastapi.testclient import TestClient
 
 
 def test_start_session_returns_token_and_state(tmp_path):

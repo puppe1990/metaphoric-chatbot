@@ -3,7 +3,6 @@ from __future__ import annotations
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-
 Base = declarative_base()
 engine = None
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False)

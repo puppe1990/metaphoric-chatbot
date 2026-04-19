@@ -12,7 +12,7 @@ Web app for guided metaphor generation and metaphor coaching.
 ```bash
 cp .env.example .env
 (cd web && npm install)
-(cd agent_service && uv sync --extra test)
+(cd agent_service && uv sync --extra test --extra lint)
 ```
 
 ### Run the agent service
@@ -33,8 +33,19 @@ npm run dev
 
 ```bash
 cd agent_service
+uv run ruff check .
 uv run pytest
 
 cd ../web
-npm test -- --run
+npm test
 ```
+
+### Pre-commit
+
+```bash
+uv tool install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+The local hooks run the shared hygiene checks plus `ruff` and `pytest` for `agent_service`, and `vitest` for `web`. The GitHub Actions workflow runs the same Python lint/test checks, plus the web build and any `lint` or `typecheck` scripts that may be added later.
