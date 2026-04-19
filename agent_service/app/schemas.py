@@ -39,6 +39,7 @@ class SessionContextUpdate(BaseModel):
     last_user_intent: TurnIntent | None = None
     sensory_mode: str | None = None
     suggestion_basis: str | None = None
+    receive_llm_question_count: int | None = None
 
 
 class StartSessionRequest(BaseModel):

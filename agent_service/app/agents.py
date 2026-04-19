@@ -26,6 +26,7 @@ class TurnInterpretation(BaseModel):
     active_metaphor_seed: str | None = None
     sensory_mode: str | None = None
     suggestion_basis: str | None = None
+    assistant_response_kind: str | None = None
 
 
 def extract_symbolic_structure(provider: ChatProvider, user_input: str) -> str:
@@ -42,6 +43,57 @@ def coach_metaphor(provider: ChatProvider, user_input: str) -> str:
 
 def finalize_receive_metaphor(provider: ChatProvider, user_input: str) -> str:
     return provider.invoke_chat(RECEIVE_FINAL_PROMPT, user_input)
+
+
+def generate_symbolic_world_choices() -> ArtifactView:
+    choices = _fallback_contextual_choices()
+    return ArtifactView(
+        artifact_type="receive_choice",
+        content=_format_contextual_choices_content(choices),
+        metadata=ArtifactMetadata(
+            clarifier_asked=False,
+            internal_candidate_count=len(choices),
+            selected_option=None,
+        ),
+        choices=choices,
+    )
+
+
+def build_receive_concrete_anchor_prompt(user_input: str) -> str:
+    world_name = _selected_symbolic_world_name(user_input)
+    if world_name == "Natureza":
+        return (
+            "Boa. Para seguir por natureza, me dê uma imagem concreta: raiz, semente, tronco, rio, pedra ou vento. "
+            "Qual aparece primeiro na sua cena?"
+        )
+    if world_name == "Guerra / estratégia":
+        return (
+            "Boa. Para seguir por guerra / estratégia, me dê uma cena concreta: muralha, ataque, fronteira, trincheira "
+            "ou cerco. Qual aparece primeiro?"
+        )
+    if world_name == "Jornada / viagem":
+        return (
+            "Boa. Para seguir por jornada / viagem, me dê uma imagem concreta: trilha, ponte, mapa, desvio, travessia "
+            "ou estação. Qual aparece primeiro?"
+        )
+    if world_name == "Máquina / engenharia":
+        return (
+            "Boa. Para seguir por máquina / engenharia, me dê uma imagem concreta: "
+            "engrenagem, alavanca, motor, painel, válvula ou parafuso. "
+            "Qual aparece primeiro?"
+        )
+    if world_name == "Energia / física":
+        return (
+            "Boa. Para seguir por energia / física, me dê uma imagem concreta: pressão, faísca, calor, peso, corrente "
+            "ou choque. Qual aparece primeiro?"
+        )
+
+    return "Boa. Agora me dê uma imagem concreta dessa cena: um objeto, uma paisagem, um mecanismo ou um som."
+
+
+def has_receive_concrete_anchor(user_input: str) -> bool:
+    substantive_lines = _collect_substantive_user_lines(user_input)
+    return len(substantive_lines) >= 2
 
 
 def interpret_turn(provider: ChatProvider, current_state: str, user_input: str) -> TurnInterpretation:
@@ -96,7 +148,11 @@ def hydrate_receive_choice_artifact(
 ) -> ArtifactView:
     choices = _parse_receive_choices(content)
     if choices is None:
-        choices = _fallback_contextual_choices() if _is_contextual_choice_content(content) else _fallback_receive_choices(content)
+        choices = (
+            _fallback_contextual_choices()
+            if _is_contextual_choice_content(content)
+            else _fallback_receive_choices(content)
+        )
 
     metadata_model = ArtifactMetadata.model_validate(metadata or {})
     return ArtifactView(
@@ -230,8 +286,16 @@ def _fallback_turn_interpretation(user_input: str) -> TurnInterpretation:
     )
 
 
-def should_finalize_receive_response(current_state: str, user_input: str, interpretation: TurnInterpretation) -> bool:
+def should_finalize_receive_response(
+    current_state: str,
+    user_input: str,
+    interpretation: TurnInterpretation,
+    receive_llm_question_count: int,
+) -> bool:
     if current_state != "refine_selected":
+        return False
+
+    if receive_llm_question_count < 3:
         return False
 
     if interpretation.intent in {"agent_option_selection", "refinement_request", "ambiguous"}:
@@ -262,6 +326,7 @@ def _is_ambiguous_reply(normalized: str) -> bool:
 
 
 def _is_refinement_request(normalized: str) -> bool:
+    normalized = normalized.strip().rstrip(".!?")
     direct_markers = {
         "mais curta",
         "mais curto",
@@ -300,6 +365,13 @@ def _collect_substantive_user_lines(user_input: str) -> list[str]:
             continue
         substantive.append(line)
     return substantive
+
+
+def _selected_symbolic_world_name(user_input: str) -> str | None:
+    match = re.search(r"selected_symbolic_world_name:\s*(.+)", user_input, flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return None
 
 
 def _looks_like_user_metaphor(normalized: str) -> bool:

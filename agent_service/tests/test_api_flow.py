@@ -1,7 +1,7 @@
 import pytest
 from app.db import SessionLocal
-from app.main import create_app
-from app.models import SessionRecord
+from app.main import build_contextual_user_input, create_app
+from app.models import ArtifactRecord, SessionRecord
 from app.orchestrator import build_assistant_message
 from fastapi.testclient import TestClient
 
@@ -64,6 +64,43 @@ def test_get_session_returns_persisted_opening_message(tmp_path):
     ]
 
 
+def test_build_contextual_user_input_includes_selected_symbolic_world_context():
+    from app.agents import generate_contextual_choices
+    from app.providers.local_provider import LocalProvider
+    from app.repository import SessionRepository
+
+    session = SessionLocal()
+    try:
+        repo = SessionRepository(session)
+        created_session = repo.create_session(mode="receive")
+
+        artifact = generate_contextual_choices(LocalProvider(), "Tenho pressa e não consigo organizar as ideias.")
+        repo.create_artifact(
+            session_id=created_session.id,
+            artifact_type=artifact.artifact_type,
+            content=artifact.content,
+            metadata={
+                **artifact.metadata.model_dump(),
+                "selected_option": "D",
+            },
+        )
+        session.commit()
+
+        contextual_input = build_contextual_user_input(
+            messages=[],
+            content="Mais poética.",
+            artifacts=session.query(ArtifactRecord).filter_by(session_id=created_session.id).all(),
+        )
+    finally:
+        session.close()
+
+    assert "selected_symbolic_world_label: D" in contextual_input
+    assert "selected_symbolic_world_name: Máquina / engenharia" in contextual_input
+    assert (
+        "selected_symbolic_world_description: Máquina / engenharia: sistema, engrenagem, processo." in contextual_input
+    )
+
+
 def test_message_endpoint_persists_transcript_and_advances_state(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
@@ -98,8 +135,7 @@ def test_message_endpoint_persists_transcript_and_advances_state(tmp_path, monke
     ]
     assert artifact["artifact_type"] == "receive_choice"
     assert body["messages"][-1]["content"] == (
-        "Escolha o mundo que mais encaixa. "
-        "Depois eu desenvolvo a metáfora por esse caminho."
+        "Escolha o mundo que mais encaixa. Depois eu desenvolvo a metáfora por esse caminho."
     )
     assert artifact["content"] != body["messages"][-1]["content"]
     assert artifact["metadata"] == {
@@ -169,11 +205,15 @@ def test_message_endpoint_promotes_user_image_to_active_metaphor_seed(tmp_path, 
 
     assert response.status_code == 200
     body = response.json()
-    assert body["state"] == "refine_selected"
-    assert "barco" in body["assistant_message"].lower() or "oceano" in body["assistant_message"].lower()
+    assert body["state"] == "present_choices"
+    assert body["assistant_message"] == (
+        "Escolha o mundo que mais encaixa. Depois eu desenvolvo a metáfora por esse caminho."
+    )
+    assert body["artifacts"][0]["artifact_type"] == "receive_choice"
+    assert [choice["label"] for choice in body["artifacts"][0]["choices"]] == ["A", "B", "C", "D", "E"]
 
     restored_body = restored.json()
-    assert restored_body["state"] == "refine_selected"
+    assert restored_body["state"] == "present_choices"
 
 
 def test_message_endpoint_refinement_request_in_present_choices_skips_literal_selection(tmp_path, monkeypatch):
@@ -189,8 +229,11 @@ def test_message_endpoint_refinement_request_in_present_choices_skips_literal_se
 
     assert response.status_code == 200
     body = response.json()
-    assert body["state"] == "refine_selected"
-    assert "mais curta" not in body["assistant_message"].lower()
+    assert body["state"] == "present_choices"
+    assert body["assistant_message"] == (
+        "Escolha o mundo que mais encaixa. Depois eu desenvolvo a metáfora por esse caminho."
+    )
+    assert [choice["label"] for choice in body["artifacts"][0]["choices"]] == ["A", "B", "C", "D", "E"]
     assert body["messages"][-1]["role"] == "assistant"
 
 
@@ -211,6 +254,33 @@ def test_message_endpoint_contextual_receive_suggestions_offer_symbolic_worlds(t
     assert "jornada / viagem: caminho, mapa, destino." in choice_texts
 
 
+def test_message_endpoint_repeated_problem_statement_in_present_choices_does_not_advance_state(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+
+    with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
+        token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
+        client.post(
+            "/api/chat/message",
+            json={"token": token, "content": "Tenho pressa e não consigo organizar as ideias."},
+        )
+        response = client.post(
+            "/api/chat/message",
+            json={"token": token, "content": "Tenho pressa e não consigo organizar as ideias."},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["state"] == "present_choices"
+    assert (
+        body["assistant_message"]
+        == "Escolha o mundo que mais encaixa. Depois eu desenvolvo a metáfora por esse caminho."
+    )
+    assert body["artifacts"][0]["artifact_type"] == "receive_choice"
+    assert [choice["label"] for choice in body["artifacts"][0]["choices"]] == ["A", "B", "C", "D", "E"]
+
+
 def test_message_endpoint_refinement_request_keeps_active_metaphor_context(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
@@ -219,14 +289,14 @@ def test_message_endpoint_refinement_request_keeps_active_metaphor_context(tmp_p
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
         client.post("/api/chat/message", json={"token": token, "content": "estou bloqueado"})
-        client.post("/api/chat/message", json={"token": token, "content": "um barco perdido no oceano"})
+        client.post("/api/chat/message", json={"token": token, "content": "C"})
         response = client.post("/api/chat/message", json={"token": token, "content": "mais concreta"})
 
     assert response.status_code == 200
-    assert (
-        "barco" in response.json()["assistant_message"].lower()
-        or "oceano" in response.json()["assistant_message"].lower()
-    )
+    message = response.json()["assistant_message"].lower()
+    assert response.json()["state"] == "refine_selected"
+    assert "jornada / viagem" in message
+    assert "trilha" in message
 
 
 def test_message_endpoint_receive_mode_converges_to_final_metaphor(tmp_path, monkeypatch):
@@ -240,17 +310,47 @@ def test_message_endpoint_receive_mode_converges_to_final_metaphor(tmp_path, mon
         client.post("/api/chat/message", json={"token": token, "content": "C"})
         client.post("/api/chat/message", json={"token": token, "content": "mais poética"})
         client.post("/api/chat/message", json={"token": token, "content": "uma luta no ringue"})
-        response = client.post(
+        first_follow_up = client.post(
             "/api/chat/message",
             json={"token": token, "content": "uma luta de anos entre uma voz suave e um chiado agressivo"},
         )
+        second_follow_up = client.post(
+            "/api/chat/message",
+            json={"token": token, "content": "o chiado aperta a cena e empurra tudo para o canto"},
+        )
+        response = client.post(
+            "/api/chat/message",
+            json={"token": token, "content": "eu preciso que no fim sobre uma abertura limpa para agir"},
+        )
 
+    assert first_follow_up.status_code == 200
+    assert "?" in first_follow_up.json()["assistant_message"]
+    assert second_follow_up.status_code == 200
+    assert "?" in second_follow_up.json()["assistant_message"]
     assert response.status_code == 200
     body = response.json()
     assert body["state"] == "refine_selected"
     assert "?" not in body["assistant_message"]
-    assert "luta" in body["assistant_message"].lower()
+    assert "ringue" in body["assistant_message"].lower()
     assert "chiado" in body["assistant_message"].lower()
+    assert body["assistant_message"].count("\n\n") == 2
+
+
+def test_message_endpoint_refinement_request_uses_symbolic_world_name_instead_of_letter(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+
+    with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
+        token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
+        client.post("/api/chat/message", json={"token": token, "content": "Estou travado para tomar uma decisão."})
+        client.post("/api/chat/message", json={"token": token, "content": "A"})
+        response = client.post("/api/chat/message", json={"token": token, "content": "Mais poética."})
+
+    assert response.status_code == 200
+    message = response.json()["assistant_message"].lower()
+    assert "na natureza que você escolheu" in message
+    assert "mundo a" not in message
 
 
 def test_message_endpoint_selection_without_existing_choice_artifact_stays_recoverable(tmp_path, monkeypatch):
@@ -278,7 +378,7 @@ def test_message_endpoint_refinement_request_preserves_persisted_active_metaphor
     with TestClient(create_app(database_url=database_url)) as client:
         token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
         client.post("/api/chat/message", json={"token": token, "content": "estou bloqueado"})
-        client.post("/api/chat/message", json={"token": token, "content": "um barco perdido no oceano"})
+        client.post("/api/chat/message", json={"token": token, "content": "B"})
         response = client.post("/api/chat/message", json={"token": token, "content": "mais concreta"})
         restored = client.get(f"/api/chat/session/{token}")
 
@@ -291,11 +391,9 @@ def test_message_endpoint_refinement_request_preserves_persisted_active_metaphor
     assert response.status_code == 200
     assert restored.status_code == 200
     assert restored.json()["state"] == "refine_selected"
-    assert persisted.active_metaphor_seed == "um barco perdido no oceano"
-    assert (
-        "barco" in response.json()["assistant_message"].lower()
-        or "oceano" in response.json()["assistant_message"].lower()
-    )
+    assert persisted.active_metaphor_seed is None
+    assert "guerra / estratégia" in response.json()["assistant_message"].lower()
+    assert persisted.receive_llm_question_count == 0
 
 
 def test_message_endpoint_rejects_blank_content(tmp_path):
@@ -359,8 +457,7 @@ def test_message_endpoint_normalizes_malformed_receive_choices_into_safe_artifac
     }
     assert [choice["label"] for choice in body["artifacts"][0]["choices"]] == ["A", "B", "C", "D", "E"]
     assert body["messages"][-1]["content"] == (
-        "Escolha o mundo que mais encaixa. "
-        "Depois eu desenvolvo a metáfora por esse caminho."
+        "Escolha o mundo que mais encaixa. Depois eu desenvolvo a metáfora por esse caminho."
     )
     assert "A." in body["artifacts"][0]["content"]
     assert "B." in body["artifacts"][0]["content"]
@@ -394,11 +491,17 @@ def test_message_endpoint_returns_structured_provider_error_when_model_is_unavai
         started = client.post("/api/chat/start", json={"mode": "receive"})
         token = started.json()["token"]
 
-        response = client.post(
+        initial = client.post(
             "/api/chat/message",
             json={"token": token, "content": "Meu projeto trava quando preciso decidir."},
         )
+        choose_world = client.post("/api/chat/message", json={"token": token, "content": "D"})
+        refine_tone = client.post("/api/chat/message", json={"token": token, "content": "Mais poética."})
+        response = client.post("/api/chat/message", json={"token": token, "content": "engrenagem"})
 
+    assert initial.status_code == 200
+    assert choose_world.status_code == 200
+    assert refine_tone.status_code == 200
     assert response.status_code == 503
     assert response.json() == {
         "detail": {
@@ -512,11 +615,39 @@ def test_build_assistant_message_finalizes_receive_when_image_has_enough_materia
             "user: uma luta de anos entre uma voz suave e um chiado agressivo"
         ),
         provider_factory=lambda: __import__("app.providers.local_provider", fromlist=["LocalProvider"]).LocalProvider(),
+        receive_llm_question_count=3,
     )
 
     assert state == "refine_selected"
     assert "?" not in message
     assert "luta" in message.lower()
+    assert message.count("\n\n") == 2
+    assert artifacts == []
+    assert interpretation is not None
+
+
+def test_build_assistant_message_keeps_exploring_before_three_llm_questions():
+    state, message, artifacts, interpretation = build_assistant_message(
+        mode="receive",
+        state="refine_selected",
+        user_input=(
+            "assistant: Descreva o problema em uma frase simples.\n"
+            "user: Sei o que quero, mas fico adiando.\n"
+            "assistant: Em qual desses mundos isso se encaixa?\n"
+            "user: C\n"
+            "assistant: Boa. Agora diga como voce quer ajustar essa opcao.\n"
+            "user: mais poetica\n"
+            "assistant: Entao o centro continua claro.\n"
+            "user: uma luta no ringue\n"
+            "assistant: O que essa imagem faz com a cena quando o conflito aparece?\n"
+            "user: uma luta de anos entre uma voz suave e um chiado agressivo"
+        ),
+        provider_factory=lambda: __import__("app.providers.local_provider", fromlist=["LocalProvider"]).LocalProvider(),
+        receive_llm_question_count=2,
+    )
+
+    assert state == "refine_selected"
+    assert "?" in message
     assert artifacts == []
     assert interpretation is not None
 

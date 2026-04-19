@@ -316,6 +316,7 @@ describe("ChatShell", () => {
     expect(within(refinementPrompt).queryByRole("button", { name: "D Um mapa cheio de desvios." })).toBeNull();
     expect(within(refinementPrompt).queryByRole("button", { name: "E Uma caldeira perto do limite." })).toBeNull();
     expect(screen.queryByRole("button", { name: "A Uma ponte oscilando no vento." })).toBeNull();
+    expect(screen.getByText("B — Um motor girando sem engatar.")).toBeInTheDocument();
   });
 
   it("renders refinement suggestions as clickable actions inside the latest assistant message", () => {

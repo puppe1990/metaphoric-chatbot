@@ -4,9 +4,11 @@ from collections.abc import Callable
 
 from app.agents import (
     TurnInterpretation,
+    build_receive_concrete_anchor_prompt,
     coach_metaphor,
     finalize_receive_metaphor,
-    generate_contextual_choices,
+    generate_symbolic_world_choices,
+    has_receive_concrete_anchor,
     interpret_turn,
     should_finalize_receive_response,
 )
@@ -18,10 +20,7 @@ START_PROMPT_BY_MODE = {
     "build": "Descreva o problema em uma frase simples.",
 }
 
-RECEIVE_SYMBOLIC_GUIDE_MESSAGE = (
-    "Escolha o mundo que mais encaixa. "
-    "Depois eu desenvolvo a metáfora por esse caminho."
-)
+RECEIVE_SYMBOLIC_GUIDE_MESSAGE = "Escolha o mundo que mais encaixa. Depois eu desenvolvo a metáfora por esse caminho."
 
 REFINE_SELECTED_MESSAGE = (
     "Boa. Agora diga como você quer ajustar essa opção: mais curta, mais concreta, mais poética ou mais direta."
@@ -40,25 +39,35 @@ def build_assistant_message(
     state: str,
     user_input: str,
     provider_factory: Callable[[], object],
+    receive_llm_question_count: int = 0,
 ) -> tuple[str, str, list[ArtifactView], TurnInterpretation | None]:
     if mode == "receive":
         if state == "intake_problem":
             return state, "Descreva o problema em uma frase simples.", [], None
         if state == "generate_candidates":
-            provider = provider_factory()
-            artifact = generate_contextual_choices(provider, user_input)
-            interpretation = interpret_turn(provider, current_state=state, user_input=user_input)
-            return "present_choices", RECEIVE_SYMBOLIC_GUIDE_MESSAGE, [artifact], interpretation
+            artifact = generate_symbolic_world_choices()
+            return "present_choices", RECEIVE_SYMBOLIC_GUIDE_MESSAGE, [artifact], None
         if state in {"present_choices", "refine_selected"}:
-            provider = provider_factory()
-            interpretation = interpret_turn(provider, current_state=state, user_input=user_input)
+            interpretation = interpret_turn(provider_factory(), current_state=state, user_input=user_input)
             if interpretation.intent == "agent_option_selection":
+                interpretation.assistant_response_kind = "receive_refinement_prompt"
                 return "refine_selected", REFINE_SELECTED_MESSAGE, [], interpretation
-            if should_finalize_receive_response(state, user_input, interpretation):
+            if state == "present_choices":
+                interpretation.assistant_response_kind = "receive_symbolic_world_prompt"
+                artifact = generate_symbolic_world_choices()
+                return "present_choices", RECEIVE_SYMBOLIC_GUIDE_MESSAGE, [artifact], interpretation
+            if interpretation.intent == "refinement_request" and not has_receive_concrete_anchor(user_input):
+                interpretation.assistant_response_kind = "receive_concrete_anchor_prompt"
+                return "refine_selected", build_receive_concrete_anchor_prompt(user_input), [], interpretation
+            provider = provider_factory()
+            if should_finalize_receive_response(state, user_input, interpretation, receive_llm_question_count):
+                interpretation.assistant_response_kind = "receive_llm_final"
                 return "refine_selected", finalize_receive_metaphor(provider, user_input), [], interpretation
             if interpretation.intent in {"user_introduced_metaphor", "refinement_request", "problem_statement"}:
+                interpretation.assistant_response_kind = "receive_llm_question"
                 return "refine_selected", coach_metaphor(provider, user_input), [], interpretation
-            artifact = generate_contextual_choices(provider, user_input)
+            interpretation.assistant_response_kind = "receive_symbolic_world_prompt"
+            artifact = generate_symbolic_world_choices()
             return "present_choices", RECEIVE_SYMBOLIC_GUIDE_MESSAGE, [artifact], interpretation
 
     if mode == "build":

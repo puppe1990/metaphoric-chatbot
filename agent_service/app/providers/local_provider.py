@@ -15,6 +15,14 @@ from app.prompts import (
 
 
 class LocalProvider:
+    SYMBOLIC_WORLD_BY_LABEL = {
+        "A": "natureza",
+        "B": "guerra",
+        "C": "jornada",
+        "D": "máquina",
+        "E": "energia",
+    }
+
     def invoke_chat(self, system_prompt: str, user_prompt: str) -> str:
         if system_prompt == EXTRACTOR_PROMPT:
             return (
@@ -113,9 +121,16 @@ class LocalProvider:
         latest = user_lines[-1] if user_lines else user_prompt.strip()
         previous = " ".join(user_lines[:-1])
         symbol = self._extract_symbol(previous) or "essa imagem"
+        selected_world = self._selected_symbolic_world(user_lines)
+        has_concrete_user_image = self._has_concrete_user_image(user_lines[:-1])
         latest_lower = latest.lower()
 
         if self._is_refinement_request(latest_lower):
+            if selected_world and not has_concrete_user_image:
+                return (
+                    f"Então, na {selected_world} que você escolheu, que elemento concreto "
+                    "(um objeto, uma paisagem ou um som) poderia simbolizar a decisão que ainda está em suspenso?"
+                )
             return (
                 f"Então o centro continua claro: {symbol}. "
                 "O que deixa essa imagem mais nítida agora: a direção falha, a neblina fecha, ou a costa some?"
@@ -200,9 +215,12 @@ class LocalProvider:
         anchor = substantive_lines[-2] if len(substantive_lines) > 1 else "o conflito antigo"
 
         return (
-            f"Fica como uma luta antiga no mesmo ringue: {anchor} segue ali, gastando força, "
-            f"enquanto {seed} tenta atravessar o ruído sem desaparecer. E o que antes era só briga cega "
-            "começa a virar um instante de definição, como se a cena finalmente mostrasse qual som ainda fica de pé."
+            f"Fica como uma luta antiga no mesmo ringue: {anchor} entra primeiro na cena, "
+            "ocupando o espaço e prendendo o corpo no mesmo circuito de esforço.\n\n"
+            f"No meio, {seed} empurra o conflito para um ponto mais agudo, como se o ruído "
+            "apertasse as cordas e obrigasse tudo a se decidir sob pressão.\n\n"
+            "No fim, a cena não explode; ela se reorganiza. O ringue ainda existe, mas abre "
+            "uma fresta limpa, e é nessa abertura que a força volta a ter direção."
         )
 
     def _extract_symbol(self, text: str) -> str | None:
@@ -279,6 +297,7 @@ class LocalProvider:
         )
 
     def _is_refinement_request(self, normalized: str) -> bool:
+        normalized = normalized.strip().rstrip(".!?")
         direct_markers = {
             "mais curta",
             "mais curto",
@@ -308,3 +327,23 @@ class LocalProvider:
         if user_lines:
             return user_lines[-1]
         return user_prompt.strip()
+
+    def _selected_symbolic_world(self, user_lines: list[str]) -> str | None:
+        for line in reversed(user_lines):
+            normalized = line.strip().upper()
+            if normalized in self.SYMBOLIC_WORLD_BY_LABEL:
+                return self.SYMBOLIC_WORLD_BY_LABEL[normalized]
+        return None
+
+    def _has_concrete_user_image(self, user_lines: list[str]) -> bool:
+        for line in reversed(user_lines):
+            normalized = line.strip()
+            if not normalized:
+                continue
+            if normalized.upper() in self.SYMBOLIC_WORLD_BY_LABEL:
+                continue
+            if self._is_refinement_request(normalized.lower()):
+                continue
+            if self._looks_like_user_metaphor(normalized):
+                return True
+        return False

@@ -189,7 +189,11 @@ export function normalizeMode(mode: string | string[] | undefined): ChatMode {
 }
 
 function getAgentUnavailableError() {
-  return new Error(`Agent service is unavailable. Verify it is running at ${DEFAULT_AGENT_BASE_URL}.`);
+  return new Error("Não consegui falar com o serviço do chat agora. Tente novamente em instantes.");
+}
+
+function getAgentTimeoutError() {
+  return new Error("O serviço do chat demorou demais para responder. Tente novamente.");
 }
 
 async function parseResponseBody(response: Response) {
@@ -234,9 +238,7 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
     return payload as T;
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error(
-        `Agent service timed out after ${REQUEST_TIMEOUT_MS}ms. Verify it is running at ${DEFAULT_AGENT_BASE_URL}.`,
-      );
+      throw getAgentTimeoutError();
     }
 
     if (error instanceof TypeError) {

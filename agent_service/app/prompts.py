@@ -36,6 +36,10 @@ Rules:
 - deliver the final metaphor only, not analysis
 - do not ask a question
 - do not use bullets or labels
+- write exactly three short paragraphs
+- paragraph 1 should open the scene and establish the blockage
+- paragraph 2 should intensify the tension, pressure, or conflict in motion
+- paragraph 3 should close with a slight reorganization, opening, or shift
 - preserve the user's symbolic field and strongest concrete elements
 - include tension and a slight movement or reorganization
 - keep it concise, vivid, and memorable

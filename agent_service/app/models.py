@@ -27,6 +27,7 @@ class SessionRecord(Base):
     last_user_intent: Mapped[str | None] = mapped_column(String(64), nullable=True)
     sensory_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
     suggestion_basis: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    receive_llm_question_count: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 

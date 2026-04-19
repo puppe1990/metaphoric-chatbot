@@ -23,6 +23,26 @@ function findLatestAssistantMessageIndex(messages: ChatMessage[]) {
     .find(({ message }) => message.role === "assistant")?.index ?? -1;
 }
 
+function expandSelectionMessage(message: ChatMessage, artifacts: ChatArtifact[]) {
+  if (message.role !== "user") {
+    return message.content;
+  }
+
+  const normalized = message.content.trim().toUpperCase();
+  if (!["A", "B", "C", "D", "E"].includes(normalized)) {
+    return message.content;
+  }
+
+  const latestReceiveChoiceArtifact = [...artifacts].reverse().find(isReceiveChoiceArtifact);
+  const matchedChoice = latestReceiveChoiceArtifact?.choices.find((choice) => choice.label === normalized);
+
+  if (!matchedChoice) {
+    return message.content;
+  }
+
+  return `${matchedChoice.label} — ${matchedChoice.text}`;
+}
+
 export function MessageList({
   artifacts = [],
   disabled = false,
@@ -61,7 +81,9 @@ export function MessageList({
           <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] opacity-70">
             {getMessageLabel(message.role)}
           </p>
-          <p className="whitespace-pre-wrap text-sm leading-6 sm:text-[0.98rem]">{message.content}</p>
+          <p className="whitespace-pre-wrap text-sm leading-6 sm:text-[0.98rem]">
+            {expandSelectionMessage(message, artifacts)}
+          </p>
           {index === receiveChoiceMessageIndex && receiveChoiceArtifact ? (
             <MetaphorChoiceList choices={receiveChoiceArtifact.choices} disabled={disabled} onSelect={onChoiceSelect} />
           ) : null}

@@ -24,6 +24,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 RECEIVE_SELECTIONS = {"A", "B", "C", "D", "E"}
+SYMBOLIC_WORLD_BY_LABEL = {
+    "A": "Natureza",
+    "B": "Guerra / estratégia",
+    "C": "Jornada / viagem",
+    "D": "Máquina / engenharia",
+    "E": "Energia / física",
+}
 
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",
@@ -255,14 +262,51 @@ def resolve_provider(db) -> ChatProvider:
     return _build_provider(cfg.provider, cfg.model)
 
 
-def build_contextual_user_input(messages: list[MessageRecord], content: str) -> str:
+def _get_selected_symbolic_world_context(artifacts: list[ArtifactRecord]) -> str:
+    latest_receive_choice_artifact = next(
+        (artifact for artifact in reversed(artifacts) if artifact.artifact_type == "receive_choice"),
+        None,
+    )
+    if latest_receive_choice_artifact is None:
+        return ""
+
+    metadata = latest_receive_choice_artifact.get_metadata() or {}
+    selected_option = metadata.get("selected_option")
+    if not isinstance(selected_option, str):
+        return ""
+
+    world_name = SYMBOLIC_WORLD_BY_LABEL.get(selected_option)
+    if world_name is None:
+        return ""
+
+    artifact_view = _artifact_record_to_view(latest_receive_choice_artifact)
+    selected_choice = next((choice for choice in artifact_view.choices if choice.label == selected_option), None)
+    selected_choice_text = selected_choice.text if selected_choice is not None else ""
+
+    context_lines = [
+        f"selected_symbolic_world_label: {selected_option}",
+        f"selected_symbolic_world_name: {world_name}",
+    ]
+    if selected_choice_text:
+        context_lines.append(f"selected_symbolic_world_description: {selected_choice_text}")
+    return "\n".join(context_lines)
+
+
+def build_contextual_user_input(
+    messages: list[MessageRecord],
+    content: str,
+    artifacts: list[ArtifactRecord] | None = None,
+) -> str:
     transcript = "\n".join(
         f"{message.role}: {message.content}" for message in messages if message.role in {"assistant", "user"}
     )
-    if not transcript:
-        return content
+    symbolic_world_context = _get_selected_symbolic_world_context(artifacts or [])
 
-    return f"{transcript}\nuser: {content}"
+    if not transcript:
+        return f"{symbolic_world_context}\nuser: {content}".strip() if symbolic_world_context else content
+
+    context_prefix = f"{symbolic_world_context}\n" if symbolic_world_context else ""
+    return f"{context_prefix}{transcript}\nuser: {content}"
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
@@ -354,6 +398,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         repo = SessionRepository(db)
         session = get_session_or_404(db, payload.token)
         existing_messages = list_session_messages(db, session.id)
+        existing_artifacts = list_session_artifacts(db, session.id)
         provider_config = _load_provider_config(db)
 
         prior_state = session.state
@@ -366,8 +411,9 @@ def create_app(database_url: str | None = None) -> FastAPI:
             resolved_state, assistant_message, artifacts, interpretation = build_assistant_message(
                 mode=session.mode,
                 state=state_for_response,
-                user_input=build_contextual_user_input(existing_messages, content),
+                user_input=build_contextual_user_input(existing_messages, content, existing_artifacts),
                 provider_factory=lambda: resolve_provider(db),
+                receive_llm_question_count=session.receive_llm_question_count,
             )
         except Exception as exc:
             raise _translate_provider_exception(exc, provider_config) from exc
@@ -391,6 +437,15 @@ def create_app(database_url: str | None = None) -> FastAPI:
                 session_context["sensory_mode"] = interpretation.sensory_mode
             if interpretation.suggestion_basis is not None:
                 session_context["suggestion_basis"] = interpretation.suggestion_basis
+            if interpretation.assistant_response_kind == "receive_llm_question":
+                session_context["receive_llm_question_count"] = session.receive_llm_question_count + 1
+            elif interpretation.assistant_response_kind in {
+                "receive_refinement_prompt",
+                "receive_symbolic_world_prompt",
+                "receive_concrete_anchor_prompt",
+                "receive_llm_final",
+            }:
+                session_context["receive_llm_question_count"] = 0
             repo.update_session_context(
                 session_id=session.id,
                 context=session_context,

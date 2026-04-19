@@ -309,6 +309,7 @@ def test_update_session_context_persists_active_metaphor_fields(tmp_path):
                 "last_user_intent": "user_introduced_metaphor",
                 "sensory_mode": "visual",
                 "suggestion_basis": "derived-from-user-image",
+                "receive_llm_question_count": 2,
             },
         )
         session.commit()
@@ -326,6 +327,7 @@ def test_update_session_context_persists_active_metaphor_fields(tmp_path):
     assert persisted.last_user_intent == "user_introduced_metaphor"
     assert persisted.sensory_mode == "visual"
     assert persisted.suggestion_basis == "derived-from-user-image"
+    assert persisted.receive_llm_question_count == 2
 
 
 def test_update_session_context_rejects_unknown_fields(tmp_path):
@@ -406,6 +408,7 @@ def test_update_session_context_partial_updates_preserve_existing_fields(tmp_pat
                 "last_user_intent": "user_introduced_metaphor",
                 "sensory_mode": "visual",
                 "suggestion_basis": "derived-from-user-image",
+                "receive_llm_question_count": 1,
             },
         )
         session.commit()
@@ -428,6 +431,7 @@ def test_update_session_context_partial_updates_preserve_existing_fields(tmp_pat
     assert updated.last_user_intent == "refinement_request"
     assert persisted.active_metaphor_seed == "um barco perdido no oceano"
     assert persisted.last_user_intent == "refinement_request"
+    assert persisted.receive_llm_question_count == 1
     assert persisted.sensory_mode == "visual"
     assert persisted.suggestion_basis == "derived-from-user-image"
 

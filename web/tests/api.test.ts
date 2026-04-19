@@ -156,7 +156,18 @@ describe("api helpers", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new TypeError("fetch failed")));
 
     await expect(getSession("tok_missing")).rejects.toThrow(
-      "Agent service is unavailable. Verify it is running at http://localhost:8000.",
+      "Não consegui falar com o serviço do chat agora. Tente novamente em instantes.",
+    );
+  });
+
+  it("surfaces a localized timeout error when the agent service takes too long", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValueOnce(new DOMException("The operation was aborted.", "AbortError")),
+    );
+
+    await expect(getSession("tok_timeout")).rejects.toThrow(
+      "O serviço do chat demorou demais para responder. Tente novamente.",
     );
   });
 
