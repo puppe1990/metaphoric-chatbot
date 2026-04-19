@@ -30,6 +30,4 @@ def next_state(mode: str, current_state: str) -> str:
     try:
         return mode_flow[current_state]
     except KeyError as exc:
-        raise ValueError(
-            f"Unsupported state {current_state!r} for mode {mode!r}"
-        ) from exc
+        raise ValueError(f"Unsupported state {current_state!r} for mode {mode!r}") from exc

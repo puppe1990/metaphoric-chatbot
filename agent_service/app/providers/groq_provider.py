@@ -22,9 +22,7 @@ class GroqProvider:
             ) from exc
         except Exception as exc:
             if not api_key:
-                raise RuntimeError(
-                    "GROQ_API_KEY is not set. Set it before creating GroqProvider."
-                ) from exc
+                raise RuntimeError("GROQ_API_KEY is not set. Set it before creating GroqProvider.") from exc
             raise
 
     def invoke_chat(self, system_prompt: str, user_prompt: str) -> str:

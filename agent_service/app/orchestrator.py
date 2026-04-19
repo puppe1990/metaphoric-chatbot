@@ -15,8 +15,7 @@ START_PROMPT_BY_MODE = {
 }
 
 REFINE_SELECTED_MESSAGE = (
-    "Boa. Agora diga como você quer ajustar essa opção: mais curta, mais concreta, "
-    "mais poética ou mais direta."
+    "Boa. Agora diga como você quer ajustar essa opção: mais curta, mais concreta, mais poética ou mais direta."
 )
 
 

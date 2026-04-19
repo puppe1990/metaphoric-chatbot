@@ -263,9 +263,7 @@ def test_update_latest_artifact_metadata_filters_by_artifact_type(tmp_path):
     try:
         persisted_choice = fresh_session.query(ArtifactRecord).filter_by(id=choice_artifact_id).one()
         note_artifact = (
-            fresh_session.query(ArtifactRecord)
-            .filter_by(session_id=created_session.id, artifact_type="note")
-            .one()
+            fresh_session.query(ArtifactRecord).filter_by(session_id=created_session.id, artifact_type="note").one()
         )
     finally:
         fresh_session.close()

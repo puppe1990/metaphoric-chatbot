@@ -33,6 +33,7 @@ npm run dev
 
 ```bash
 cd agent_service
+uv run ruff format .
 uv run ruff check .
 uv run pytest
 
@@ -48,4 +49,4 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-The local hooks run the shared hygiene checks plus `ruff` and `pytest` for `agent_service`, and `vitest` for `web`. The GitHub Actions workflow runs the same Python lint/test checks, plus the web build and any `lint` or `typecheck` scripts that may be added later.
+The local hooks run the shared hygiene checks plus `ruff format`, `ruff`, and `pytest` for `agent_service`, and `vitest` for `web`. The GitHub Actions workflow runs the same Python format/lint/test checks, plus the web build and any `lint` or `typecheck` scripts that may be added later.

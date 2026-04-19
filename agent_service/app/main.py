@@ -53,12 +53,7 @@ def get_session_or_404(db, token: str) -> SessionRecord:
 
 
 def list_session_messages(db, session_id: int) -> list[MessageRecord]:
-    return (
-        db.query(MessageRecord)
-        .filter(MessageRecord.session_id == session_id)
-        .order_by(MessageRecord.id.asc())
-        .all()
-    )
+    return db.query(MessageRecord).filter(MessageRecord.session_id == session_id).order_by(MessageRecord.id.asc()).all()
 
 
 def serialize_messages(messages: list[MessageRecord]) -> list[dict[str, str]]:
@@ -67,10 +62,7 @@ def serialize_messages(messages: list[MessageRecord]) -> list[dict[str, str]]:
 
 def list_session_artifacts(db, session_id: int) -> list[ArtifactRecord]:
     return (
-        db.query(ArtifactRecord)
-        .filter(ArtifactRecord.session_id == session_id)
-        .order_by(ArtifactRecord.id.asc())
-        .all()
+        db.query(ArtifactRecord).filter(ArtifactRecord.session_id == session_id).order_by(ArtifactRecord.id.asc()).all()
     )
 
 
@@ -100,9 +92,7 @@ def create_provider() -> ChatProvider:
 
 def build_contextual_user_input(messages: list[MessageRecord], content: str) -> str:
     transcript = "\n".join(
-        f"{message.role}: {message.content}"
-        for message in messages
-        if message.role in {"assistant", "user"}
+        f"{message.role}: {message.content}" for message in messages if message.role in {"assistant", "user"}
     )
     if not transcript:
         return content
@@ -181,11 +171,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         session = get_session_or_404(db, payload.token)
         existing_messages = list_session_messages(db, session.id)
 
-        if (
-            session.mode == "receive"
-            and session.state == "present_choices"
-            and content in RECEIVE_SELECTIONS
-        ):
+        if session.mode == "receive" and session.state == "present_choices" and content in RECEIVE_SELECTIONS:
             updated_artifact = repo.update_latest_artifact_metadata(
                 session_id=session.id,
                 artifact_type="receive_choice",

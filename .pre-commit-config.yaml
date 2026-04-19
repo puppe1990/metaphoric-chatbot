@@ -8,6 +8,13 @@ repos:
 
   - repo: local
     hooks:
+      - id: agent-service-format
+        name: agent_service ruff format
+        entry: bash -c 'cd agent_service && uv run --extra lint ruff format --check .'
+        language: system
+        pass_filenames: false
+        files: ^agent_service/
+
       - id: agent-service-lint
         name: agent_service ruff
         entry: bash -c 'cd agent_service && uv run --extra lint ruff check .'

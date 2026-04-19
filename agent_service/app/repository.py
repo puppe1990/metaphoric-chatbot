@@ -84,12 +84,8 @@ class SessionRepository:
             return None
 
         current_metadata = record.get_metadata() or {}
-        metadata_updates = (
-            metadata.model_dump() if isinstance(metadata, ArtifactMetadata) else dict(metadata)
-        )
-        updated_metadata = ArtifactMetadata.model_validate(
-            {**current_metadata, **metadata_updates}
-        ).model_dump()
+        metadata_updates = metadata.model_dump() if isinstance(metadata, ArtifactMetadata) else dict(metadata)
+        updated_metadata = ArtifactMetadata.model_validate({**current_metadata, **metadata_updates}).model_dump()
         record.set_metadata(updated_metadata)
         self.db.add(record)
         self.db.flush()

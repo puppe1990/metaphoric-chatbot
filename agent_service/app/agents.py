@@ -7,9 +7,7 @@ from .providers.base import ChatProvider
 from .schemas import ArtifactMetadata, ArtifactView, MetaphorChoice
 
 CHOICE_LABELS = ("A", "B", "C")
-CHOICE_PATTERN = re.compile(
-    r"(?ims)^\s*([ABC])\s*[\.\):-]\s*(.+?)(?=^\s*[ABC]\s*[\.\):-]\s*|\Z)"
-)
+CHOICE_PATTERN = re.compile(r"(?ims)^\s*([ABC])\s*[\.\):-]\s*(.+?)(?=^\s*[ABC]\s*[\.\):-]\s*|\Z)")
 
 
 def extract_symbolic_structure(provider: ChatProvider, user_input: str) -> str:
