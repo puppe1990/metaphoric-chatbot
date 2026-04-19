@@ -1,3 +1,0 @@
-{"type":"click","text":"B\n    \n      Densidade excessiva\n      Tem informacao demais concentrada no topo e isso deixa tudo pesado.","choice":"density","id":null,"timestamp":1776566358915}
-{"type":"click","text":"A\n    \n      Hierarquia ruim\n      Titulo, descricao, status e acoes parecem disputar o mesmo peso visual.","choice":"hierarchy","id":null,"timestamp":1776566359415}
-{"type":"click","text":"C\n    \n      Acoes mal posicionadas\n      Os botoes parecem soltos e sem relacao clara com o contexto principal.","choice":"actions","id":null,"timestamp":1776566360605}

@@ -1,2 +1,0 @@
-[     176ms] [ERROR] Access to fetch at 'http://localhost:8000/api/chat/start' from origin 'http://127.0.0.1:3001' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://127.0.0.1:3001/c/new?mode=receive:0
-[     178ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/chat/start:0

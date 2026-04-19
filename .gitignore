@@ -14,3 +14,10 @@ playwright-report/
 test-results/
 coverage/
 tmp_real_validation/
+.playwright-mcp/
+web/.superpowers/
+web/.node-localstorage
+web/.node-localstorage-shm
+web/.node-localstorage-wal
+livros_metafora/
+markdown/
