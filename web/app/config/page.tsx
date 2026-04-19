@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Select, { type StylesConfig } from "react-select";
 import { getProviderConfig, setProviderConfig, type ProviderConfig } from "../../lib/api";
 
 type Status = "idle" | "loading" | "saving" | "saved" | "error";
@@ -9,6 +10,29 @@ const PROVIDER_LABELS: Record<string, string> = {
   groq: "Groq",
   nvidia: "NVIDIA NIM",
   local: "Local (mock)",
+};
+
+type Option = { value: string; label: string };
+
+const selectStyles: StylesConfig<Option> = {
+  control: (base, state) => ({
+    ...base,
+    borderRadius: "0.75rem",
+    borderColor: state.isFocused ? "#171912" : "rgba(0,0,0,0.1)",
+    boxShadow: state.isFocused ? "0 0 0 2px rgba(23,25,18,0.12)" : base.boxShadow,
+    backgroundColor: "#fff",
+    padding: "2px 4px",
+    fontSize: "0.875rem",
+    "&:hover": { borderColor: "#171912" },
+  }),
+  option: (base, state) => ({
+    ...base,
+    fontSize: "0.875rem",
+    backgroundColor: state.isSelected ? "#171912" : state.isFocused ? "#f4f6f1" : "#fff",
+    color: state.isSelected ? "#fff" : "#171912",
+  }),
+  singleValue: (base) => ({ ...base, color: "#171912" }),
+  menu: (base) => ({ ...base, borderRadius: "0.75rem", overflow: "hidden" }),
 };
 
 export default function ConfigPage() {
@@ -34,8 +58,8 @@ export default function ConfigPage() {
 
   function handleProviderChange(p: string) {
     setProvider(p);
-    if (p === "groq") setModel(config?.groq_models[0] ?? "llama-3.3-70b-versatile");
-    if (p === "nvidia") setModel(config?.nvidia_models[0] ?? "meta/llama-3.3-70b-instruct");
+    if (p === "groq") setModel((config?.groq_models ?? [])[0] ?? "llama-3.3-70b-versatile");
+    if (p === "nvidia") setModel((config?.nvidia_models ?? [])[0] ?? "meta/llama-3.3-70b-instruct");
   }
 
   async function handleSave() {
@@ -43,7 +67,7 @@ export default function ConfigPage() {
     setError(null);
     try {
       await setProviderConfig(provider, model);
-      setConfig((prev) => prev ? { ...prev, provider, model } : prev);
+      setConfig((prev) => (prev ? { ...prev, provider, model } : prev));
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 2000);
     } catch (err) {
@@ -59,6 +83,8 @@ export default function ConfigPage() {
         ? (config?.nvidia_models ?? ["meta/llama-3.3-70b-instruct"])
         : [];
 
+  const modelOptions: Option[] = modelList.map((m) => ({ value: m, label: m }));
+  const selectedOption = modelOptions.find((o) => o.value === model) ?? null;
   const isDirty = config && (provider !== config.provider || model !== config.model);
 
   return (
@@ -94,7 +120,7 @@ export default function ConfigPage() {
                 </div>
               </fieldset>
 
-              {modelList.length > 0 && (
+              {modelOptions.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <label
                     htmlFor="model-select"
@@ -102,18 +128,15 @@ export default function ConfigPage() {
                   >
                     Modelo
                   </label>
-                  <select
-                    id="model-select"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-ink/20"
-                  >
-                    {modelList.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    inputId="model-select"
+                    options={modelOptions}
+                    value={selectedOption}
+                    onChange={(opt) => opt && setModel(opt.value)}
+                    styles={selectStyles}
+                    isSearchable
+                    placeholder="Selecione um modelo…"
+                  />
                 </div>
               )}
 
