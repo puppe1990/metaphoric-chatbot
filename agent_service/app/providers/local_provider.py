@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import json
 import re
 
-from app.prompts import COACH_PROMPT, EXTRACTOR_PROMPT, GENERATOR_PROMPT, RECEIVE_CHOICES_PROMPT
+from app.prompts import (
+    COACH_PROMPT,
+    EXTRACTOR_PROMPT,
+    GENERATOR_PROMPT,
+    RECEIVE_CHOICES_PROMPT,
+    RECEIVE_CONTEXTUAL_PROMPT,
+    TURN_INTERPRETER_PROMPT,
+)
 
 
 class LocalProvider:
@@ -22,6 +30,38 @@ class LocalProvider:
             )
 
         if system_prompt == RECEIVE_CHOICES_PROMPT:
+            return self._receive_choices_response(user_prompt)
+
+        if system_prompt == TURN_INTERPRETER_PROMPT:
+            latest = self._latest_user_line(user_prompt)
+            if latest.upper() in {"A", "B", "C"}:
+                return (
+                    '{"intent":"agent_option_selection","active_metaphor_seed":null,'
+                    '"sensory_mode":null,"suggestion_basis":"literal-choice"}'
+                )
+            if re.search(r"\b(um|uma)\b", latest, flags=re.IGNORECASE):
+                return json.dumps(
+                    {
+                        "intent": "user_introduced_metaphor",
+                        "active_metaphor_seed": latest,
+                        "sensory_mode": "visual",
+                        "suggestion_basis": "derived-from-user-image",
+                    },
+                    ensure_ascii=False,
+                )
+            return (
+                '{"intent":"problem_statement","active_metaphor_seed":null,'
+                '"sensory_mode":"kinesthetic","suggestion_basis":"derived-from-user-problem"}'
+            )
+
+        if system_prompt == RECEIVE_CONTEXTUAL_PROMPT:
+            latest = self._latest_user_line(user_prompt).lower()
+            if "bloque" in latest or "trava" in latest:
+                return (
+                    "A. Como um corredor estreito entupido de caixas.\n"
+                    "B. Como um motor que gira e não engata.\n"
+                    "C. Como água presa atrás de uma comporta.\n"
+                )
             return self._receive_choices_response(user_prompt)
 
         if system_prompt == COACH_PROMPT:
@@ -83,3 +123,13 @@ class LocalProvider:
         if not match:
             return None
         return f"{match.group(1).lower()} {match.group(2).strip()}"
+
+    def _latest_user_line(self, user_prompt: str) -> str:
+        user_lines = [
+            line.split(":", 1)[1].strip()
+            for line in user_prompt.splitlines()
+            if line.lower().startswith("user:") and ":" in line
+        ]
+        if user_lines:
+            return user_lines[-1]
+        return user_prompt.strip()

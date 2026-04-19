@@ -39,3 +39,26 @@ Rules:
 - vary the symbolic field across the three options
 - do not diagnose, moralize, or explain too much
 - end by inviting the user to choose one option"""
+
+TURN_INTERPRETER_PROMPT = """Classify the user's latest turn in receive mode.
+Return compact JSON with:
+- intent
+- active_metaphor_seed
+- sensory_mode
+- suggestion_basis
+Rules:
+- write in Brazilian Portuguese-compatible semantics
+- if the user introduces a new image, prefer user_introduced_metaphor
+- if the user asks to adjust wording, use refinement_request
+- if the user literally answers A, B, or C, use agent_option_selection
+"""
+
+RECEIVE_CONTEXTUAL_PROMPT = """You generate three contextual metaphor proposals from the user's language.
+Rules:
+- write in Brazilian Portuguese
+- derive from the user's most recent relevant words
+- preserve the user's symbolic field if one already exists
+- vary angle, pressure, movement, or perspective instead of changing theme randomly
+- keep each option short, concrete, image-based
+- do not force quiz framing
+"""

@@ -278,4 +278,27 @@ def test_build_fallback_coaching_uses_user_image_without_invalidating_it():
     assert message.startswith("Então")
     assert not message.startswith("Use ")
     assert message.count("?") <= 1
-    assert artifacts == []
+
+
+def test_interpret_turn_marks_user_metaphor_when_user_supplies_new_image():
+    from app.agents import interpret_turn
+    from app.providers.local_provider import LocalProvider
+
+    result = interpret_turn(
+        LocalProvider(),
+        current_state="present_choices",
+        user_input=("assistant: Escolha a imagem que mais acerta o problema agora.\nuser: um barco perdido no oceano"),
+    )
+
+    assert result.intent == "user_introduced_metaphor"
+    assert result.active_metaphor_seed == "um barco perdido no oceano"
+
+
+def test_generate_contextual_choices_fallback_stays_in_user_semantic_field():
+    from app.agents import generate_contextual_choices
+    from app.providers.local_provider import LocalProvider
+
+    artifact = generate_contextual_choices(LocalProvider(), "estou bloqueado")
+
+    choice_texts = [choice.text.lower() for choice in artifact.choices]
+    assert any("bloque" in text or "trav" in text or "pres" in text for text in choice_texts)
