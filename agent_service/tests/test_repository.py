@@ -349,6 +349,48 @@ def test_update_session_context_rejects_unknown_fields(tmp_path):
         session.close()
 
 
+def test_update_session_context_rejects_invalid_value_types(tmp_path):
+    database_url = f"sqlite:///{tmp_path}/test.db"
+    init_db(database_url)
+    session = SessionLocal()
+    try:
+        repo = SessionRepository(session)
+        created = repo.create_session(mode="receive")
+
+        try:
+            repo.update_session_context(
+                session_id=created.id,
+                context={"active_metaphor_seed": {"foo": "bar"}},
+            )
+        except ValueError as exc:
+            assert "Invalid session context payload" in str(exc)
+        else:
+            raise AssertionError("Expected update_session_context to reject invalid value types")
+    finally:
+        session.close()
+
+
+def test_update_session_context_rejects_invalid_turn_intent(tmp_path):
+    database_url = f"sqlite:///{tmp_path}/test.db"
+    init_db(database_url)
+    session = SessionLocal()
+    try:
+        repo = SessionRepository(session)
+        created = repo.create_session(mode="receive")
+
+        try:
+            repo.update_session_context(
+                session_id=created.id,
+                context={"last_user_intent": "not-a-real-intent"},
+            )
+        except ValueError as exc:
+            assert "Invalid session context payload" in str(exc)
+        else:
+            raise AssertionError("Expected update_session_context to reject invalid turn intent")
+    finally:
+        session.close()
+
+
 def test_init_db_backfills_receive_context_columns_for_existing_sqlite_sessions_table(tmp_path):
     database_path = tmp_path / "legacy.db"
     with sqlite3.connect(database_path) as connection:

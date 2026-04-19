@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Mapping
-from typing import get_args
 
 from app.models import ArtifactRecord, SessionRecord
-from app.schemas import ArtifactMetadata, TurnIntent
+from app.schemas import ArtifactMetadata, SessionContextUpdate
+from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
 DEFAULT_STATE_BY_MODE = {
@@ -19,7 +19,6 @@ SESSION_CONTEXT_FIELDS = {
     "sensory_mode",
     "suggestion_basis",
 }
-TURN_INTENT_VALUES = set(get_args(TurnIntent))
 
 
 class SessionRepository:
@@ -106,12 +105,13 @@ class SessionRepository:
         if unknown_fields:
             raise ValueError(f"Unsupported session context fields: {', '.join(unknown_fields)}")
 
-        intent = context.get("last_user_intent")
-        if intent is not None and intent not in TURN_INTENT_VALUES:
-            raise ValueError(f"Unsupported turn intent: {intent!r}")
+        try:
+            validated_context = SessionContextUpdate.model_validate(dict(context)).model_dump()
+        except ValidationError as exc:
+            raise ValueError(f"Invalid session context payload: {exc}") from exc
 
         record = self.db.query(SessionRecord).filter(SessionRecord.id == session_id).one()
-        for key, value in context.items():
+        for key, value in validated_context.items():
             setattr(record, key, value)
         self.db.add(record)
         self.db.flush()
