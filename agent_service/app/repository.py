@@ -2,15 +2,24 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Mapping
+from typing import get_args
 
 from app.models import ArtifactRecord, SessionRecord
-from app.schemas import ArtifactMetadata
+from app.schemas import ArtifactMetadata, TurnIntent
 from sqlalchemy.exc import IntegrityError
 
 DEFAULT_STATE_BY_MODE = {
     "receive": "intake_problem",
     "build": "intake_problem",
 }
+
+SESSION_CONTEXT_FIELDS = {
+    "active_metaphor_seed",
+    "last_user_intent",
+    "sensory_mode",
+    "suggestion_basis",
+}
+TURN_INTENT_VALUES = set(get_args(TurnIntent))
 
 
 class SessionRepository:
@@ -93,6 +102,14 @@ class SessionRepository:
         return record
 
     def update_session_context(self, session_id: int, context: Mapping[str, object]) -> SessionRecord:
+        unknown_fields = sorted(set(context) - SESSION_CONTEXT_FIELDS)
+        if unknown_fields:
+            raise ValueError(f"Unsupported session context fields: {', '.join(unknown_fields)}")
+
+        intent = context.get("last_user_intent")
+        if intent is not None and intent not in TURN_INTENT_VALUES:
+            raise ValueError(f"Unsupported turn intent: {intent!r}")
+
         record = self.db.query(SessionRecord).filter(SessionRecord.id == session_id).one()
         for key, value in context.items():
             setattr(record, key, value)
