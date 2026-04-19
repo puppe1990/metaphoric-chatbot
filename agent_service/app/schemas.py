@@ -4,6 +4,14 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+TurnIntent = Literal[
+    "problem_statement",
+    "agent_option_selection",
+    "user_introduced_metaphor",
+    "refinement_request",
+    "ambiguous",
+]
+
 
 class MetaphorChoice(BaseModel):
     label: Literal["A", "B", "C"]

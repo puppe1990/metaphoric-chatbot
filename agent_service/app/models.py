@@ -23,6 +23,10 @@ class SessionRecord(Base):
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     provider: Mapped[str] = mapped_column(String(32), default="groq")
     model: Mapped[str] = mapped_column(String(128), default="default")
+    active_metaphor_seed: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_user_intent: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    sensory_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    suggestion_basis: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 

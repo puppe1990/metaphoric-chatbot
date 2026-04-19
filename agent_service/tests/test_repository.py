@@ -290,3 +290,37 @@ def test_update_latest_artifact_metadata_returns_none_when_no_match_exists(tmp_p
         session.close()
 
     assert updated is None
+
+
+def test_update_session_context_persists_active_metaphor_fields(tmp_path):
+    database_url = f"sqlite:///{tmp_path}/test.db"
+    init_db(database_url)
+    session = SessionLocal()
+    try:
+        repo = SessionRepository(session)
+        created = repo.create_session(mode="receive")
+
+        updated = repo.update_session_context(
+            session_id=created.id,
+            context={
+                "active_metaphor_seed": "um barco perdido no oceano",
+                "last_user_intent": "user_introduced_metaphor",
+                "sensory_mode": "visual",
+                "suggestion_basis": "derived-from-user-image",
+            },
+        )
+        session.commit()
+        session_id = created.id
+    finally:
+        session.close()
+
+    fresh = SessionLocal()
+    try:
+        persisted = fresh.query(SessionRecord).filter_by(id=session_id).one()
+    finally:
+        fresh.close()
+
+    assert updated.active_metaphor_seed == "um barco perdido no oceano"
+    assert persisted.last_user_intent == "user_introduced_metaphor"
+    assert persisted.sensory_mode == "visual"
+    assert persisted.suggestion_basis == "derived-from-user-image"

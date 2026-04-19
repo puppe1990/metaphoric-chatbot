@@ -91,3 +91,12 @@ class SessionRepository:
         self.db.flush()
         self.db.refresh(record)
         return record
+
+    def update_session_context(self, session_id: int, context: Mapping[str, object]) -> SessionRecord:
+        record = self.db.query(SessionRecord).filter(SessionRecord.id == session_id).one()
+        for key, value in context.items():
+            setattr(record, key, value)
+        self.db.add(record)
+        self.db.flush()
+        self.db.refresh(record)
+        return record
