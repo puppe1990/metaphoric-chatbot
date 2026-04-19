@@ -94,7 +94,7 @@ export function ChatShell({
   }, [session.messages, session.artifacts]);
 
   return (
-    <section className="flex min-h-0 flex-1 px-3 pb-3 text-ink sm:px-5">
+    <section className="flex min-h-0 flex-1 px-3 pt-3 text-ink sm:px-5 sm:pt-4">
       <div className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-ink/10 bg-white/82 shadow-[0_24px_80px_rgba(23,25,18,0.12)] backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink/10 bg-white/78 px-4 py-4 sm:px-6">
           <ProgressChip label={session.progressLabel} />
@@ -120,9 +120,9 @@ export function ChatShell({
           </div>
         </div>
 
-        <section className="flex min-h-0 flex-1 flex-col">
+        <section className="relative flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6" ref={transcriptRef}>
-            <div className="mx-auto max-w-3xl">
+            <div className="mx-auto max-w-3xl pb-[19rem] sm:pb-[17rem]">
               <MessageList
                 artifacts={session.artifacts}
                 disabled={inputDisabled}
@@ -131,26 +131,28 @@ export function ChatShell({
               />
             </div>
           </div>
-          <div className="mx-auto mt-auto w-full max-w-3xl">
-            <ChatInput
-              disabled={inputDisabled}
-              formRef={formRef}
-              helperText={
-                session.mode === "receive"
-                  ? "Descreva o problema em uma frase. Se eu tiver contexto suficiente, já te mostro 3 caminhos."
-                  : "Envie sua resposta para avançar o estado guiado desta conversa."
-              }
-              onChange={handleChange}
-              onValueChange={updateValue}
-              onSubmit={handleSubmit}
-              placeholder={
-                session.mode === "build"
-                  ? "Ex.: uma porta emperrada, um espelho riscado..."
-                  : "Ex.: o projeto trava quando precisa decidir..."
-              }
-              suggestions={session.suggestions}
-              value={value}
-            />
+          <div className="z-10 border-t border-ink/10 bg-gradient-to-t from-[#f4f6f1] via-[#f4f6f1]/95 to-transparent px-4 pb-4 pt-6 sm:px-6">
+            <div className="mx-auto w-full max-w-3xl">
+              <ChatInput
+                disabled={inputDisabled}
+                formRef={formRef}
+                helperText={
+                  session.mode === "receive"
+                    ? "Descreva o problema em uma frase. Se eu tiver contexto suficiente, já te mostro 3 caminhos."
+                    : "Envie sua resposta para avançar o estado guiado desta conversa."
+                }
+                onChange={handleChange}
+                onValueChange={updateValue}
+                onSubmit={handleSubmit}
+                placeholder={
+                  session.mode === "build"
+                    ? "Ex.: uma porta emperrada, um espelho riscado..."
+                    : "Ex.: o projeto trava quando precisa decidir..."
+                }
+                suggestions={session.suggestions}
+                value={value}
+              />
+            </div>
           </div>
         </section>
       </div>

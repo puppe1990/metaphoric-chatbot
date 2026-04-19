@@ -10,7 +10,7 @@ const navigationLinks = [
 
 export function AppHeader() {
   return (
-    <header className="border-b border-black/10 bg-white/70 backdrop-blur">
+    <header className="border-b border-black/10 bg-white/70 backdrop-blur" data-app-header>
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 py-4 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-12">
         <Link href="/" className="w-fit">
           <div>

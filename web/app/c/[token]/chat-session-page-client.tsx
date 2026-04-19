@@ -25,6 +25,7 @@ function getErrorMessage(error: unknown) {
 
 export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageClientProps) {
   const router = useRouter();
+  const [availableViewportHeight, setAvailableViewportHeight] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,6 +33,36 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sessionView, setSessionView] = useState<GuidedSessionView | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    const updateAvailableHeight = () => {
+      const header = document.querySelector<HTMLElement>("[data-app-header]");
+      const headerHeight = header?.offsetHeight ?? 0;
+      setAvailableViewportHeight(Math.max(window.innerHeight - headerHeight, 0));
+    };
+
+    updateAvailableHeight();
+    window.addEventListener("resize", updateAvailableHeight);
+
+    return () => {
+      window.removeEventListener("resize", updateAvailableHeight);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,7 +195,10 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
   }
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden pt-4">
+    <main
+      className="flex min-h-0 flex-col overflow-x-hidden overflow-y-hidden"
+      style={availableViewportHeight ? { height: `${availableViewportHeight}px` } : undefined}
+    >
       <div className="min-h-0 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           {error ? (

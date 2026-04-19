@@ -46,7 +46,7 @@ describe("ChatShell", () => {
     expect(input).toHaveValue("");
   });
 
-  it("anchors the chat input to the bottom edge of the shell", () => {
+  it("keeps the chat input pinned to the bottom edge while the transcript scrolls", () => {
     const session: GuidedSessionView = {
       token: "tok_layout",
       mode: "receive",
@@ -64,13 +64,14 @@ describe("ChatShell", () => {
 
     const layoutSection = container.querySelectorAll("section")[1];
     const transcript = layoutSection?.querySelector("div");
-    const form = screen.getByRole("button", { name: "Enviar" }).closest("form");
+    const inputRegion = screen.getByRole("button", { name: "Enviar" }).closest("form")?.parentElement?.parentElement;
 
     expect(layoutSection).toHaveClass("flex");
     expect(layoutSection).toHaveClass("flex-1");
     expect(layoutSection).toHaveClass("flex-col");
     expect(transcript?.className).toContain("flex-1");
-    expect(form?.parentElement).toHaveClass("mt-auto");
+    expect(inputRegion).toHaveClass("z-10");
+    expect(inputRegion).toHaveClass("pb-4");
   });
 
   it("stretches the shell card to fill the available page height", () => {

@@ -160,8 +160,37 @@ describe("ChatSessionPageClient", () => {
 
     const main = container.querySelector("main");
     expect(main).toHaveClass("flex");
-    expect(main).toHaveClass("flex-1");
     expect(main).toHaveClass("min-h-0");
     expect(main).toHaveClass("overflow-x-hidden");
+  });
+
+  it("locks document scrolling while the chat page is mounted", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            token: "receive_token",
+            mode: "receive",
+            state: "intake_problem",
+            messages: [{ role: "assistant", content: "Descreva o problema em uma frase simples." }],
+            artifacts: [],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    const { unmount } = render(<ChatSessionPageClient requestedMode="receive" token="receive_token" />);
+
+    await screen.findByText("Descreva o problema em uma frase simples.");
+
+    expect(document.documentElement.style.overflow).toBe("hidden");
+    expect(document.body.style.overflow).toBe("hidden");
+
+    unmount();
+
+    expect(document.documentElement.style.overflow).toBe("");
+    expect(document.body.style.overflow).toBe("");
   });
 });

@@ -37,7 +37,7 @@ sleep 1
 
 (
   cd "$ROOT_DIR/agent_service"
-  uv run uvicorn app.main:app --reload
+  uv run python -m uvicorn app.main:app --reload
 ) &
 AGENT_PID=$!
 

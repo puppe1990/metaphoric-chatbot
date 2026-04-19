@@ -41,7 +41,7 @@ export function ChatInput({
   };
 
   return (
-    <form className="border-t border-ink/10 bg-fog/85 px-4 py-4 backdrop-blur sm:px-5" onSubmit={onSubmit} ref={formRef}>
+    <form className="rounded-t-[1.6rem] bg-fog/92 px-4 py-4 shadow-[0_-18px_45px_rgba(23,25,18,0.08)] backdrop-blur sm:px-5" onSubmit={onSubmit} ref={formRef}>
       <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-clay">
         Sua próxima linha
       </label>
