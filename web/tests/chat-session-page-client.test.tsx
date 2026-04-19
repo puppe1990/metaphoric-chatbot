@@ -136,4 +136,32 @@ describe("ChatSessionPageClient", () => {
     expect(screen.queryByText("Restaurar sessão")).not.toBeInTheDocument();
     expect(screen.queryByText("Sessões recentes salvas neste navegador.")).not.toBeInTheDocument();
   });
+
+  it("uses the viewport remainder below the global header and clips horizontal overflow", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            token: "receive_token",
+            mode: "receive",
+            state: "intake_problem",
+            messages: [{ role: "assistant", content: "Descreva o problema em uma frase simples." }],
+            artifacts: [],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    const { container } = render(<ChatSessionPageClient requestedMode="receive" token="receive_token" />);
+
+    await screen.findByText("Descreva o problema em uma frase simples.");
+
+    const main = container.querySelector("main");
+    expect(main).toHaveClass("flex");
+    expect(main).toHaveClass("flex-1");
+    expect(main).toHaveClass("min-h-0");
+    expect(main).toHaveClass("overflow-x-hidden");
+  });
 });

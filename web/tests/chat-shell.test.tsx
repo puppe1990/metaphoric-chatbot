@@ -46,6 +46,57 @@ describe("ChatShell", () => {
     expect(input).toHaveValue("");
   });
 
+  it("anchors the chat input to the bottom edge of the shell", () => {
+    const session: GuidedSessionView = {
+      token: "tok_layout",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "intake_problem",
+      messages: [{ role: "assistant", content: "Descreva o problema em uma frase simples." }],
+      artifacts: [],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: ["Estou travado para tomar uma decisão."],
+    };
+
+    const { container } = render(<ChatShell session={session} />);
+
+    const layoutSection = container.querySelectorAll("section")[1];
+    const transcript = layoutSection?.querySelector("div");
+    const form = screen.getByRole("button", { name: "Enviar" }).closest("form");
+
+    expect(layoutSection).toHaveClass("flex");
+    expect(layoutSection).toHaveClass("flex-1");
+    expect(layoutSection).toHaveClass("flex-col");
+    expect(transcript?.className).toContain("flex-1");
+    expect(form?.parentElement).toHaveClass("mt-auto");
+  });
+
+  it("stretches the shell card to fill the available page height", () => {
+    const session: GuidedSessionView = {
+      token: "tok_fill",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "intake_problem",
+      messages: [{ role: "assistant", content: "Descreva o problema em uma frase simples." }],
+      artifacts: [],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: [],
+    };
+
+    const { container } = render(<ChatShell session={session} />);
+
+    const outerSection = container.querySelector("section");
+    const card = outerSection?.querySelector("div");
+
+    expect(outerSection).toHaveClass("flex");
+    expect(outerSection).toHaveClass("flex-1");
+    expect(card).toHaveClass("flex-1");
+  });
+
   it("renders receive-choice artifacts under the latest assistant message in the transcript", () => {
     const session: GuidedSessionView = {
       token: "tok_choices",
