@@ -1,7 +1,6 @@
-from fastapi.testclient import TestClient
-
 from app.main import create_app
 from app.orchestrator import build_assistant_message
+from fastapi.testclient import TestClient
 
 
 def test_start_session_returns_token_and_state(tmp_path):
@@ -250,9 +249,7 @@ def test_build_fallback_coaching_responds_to_user_attempt_without_repeating_prom
             "assistant: Boa direção. Escolha uma imagem concreta e diga o que ela faz quando o conflito aparece.\n"
             "user: falo uma bobagem muito grande"
         ),
-        provider_factory=lambda: __import__(
-            "app.providers.local_provider", fromlist=["LocalProvider"]
-        ).LocalProvider(),
+        provider_factory=lambda: __import__("app.providers.local_provider", fromlist=["LocalProvider"]).LocalProvider(),
     )
 
     assert state == "coach_feedback"

@@ -23,7 +23,8 @@ Rules:
 - critique cliche, vagueness, moralizing, weak movement
 - do not flatter weak work"""
 
-RECEIVE_CHOICES_PROMPT = """You generate three metaphor candidates from the user's first problem sentence.
+RECEIVE_CHOICES_PROMPT = """You generate three metaphor candidates
+from the user's first problem sentence.
 Rules:
 - write in Brazilian Portuguese
 - present exactly three options labeled A., B., and C.

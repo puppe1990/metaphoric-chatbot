@@ -4,13 +4,10 @@ from collections.abc import Generator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-
+from app.agents import hydrate_receive_choice_artifact
 from app.config import get_allowed_origins, load_environment_file
 from app.db import SessionLocal, init_db
 from app.models import ArtifactRecord, MessageRecord, SessionRecord
-from app.agents import hydrate_receive_choice_artifact
 from app.orchestrator import (
     REFINE_SELECTED_MESSAGE,
     advance_mode,
@@ -22,6 +19,8 @@ from app.providers.groq_provider import GroqProvider
 from app.providers.local_provider import LocalProvider
 from app.repository import SessionRepository
 from app.schemas import ArtifactView, ChatResponse, MessageRequest, StartSessionRequest
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 RECEIVE_SELECTIONS = {"A", "B", "C"}
 
@@ -54,12 +53,7 @@ def get_session_or_404(db, token: str) -> SessionRecord:
 
 
 def list_session_messages(db, session_id: int) -> list[MessageRecord]:
-    return (
-        db.query(MessageRecord)
-        .filter(MessageRecord.session_id == session_id)
-        .order_by(MessageRecord.id.asc())
-        .all()
-    )
+    return db.query(MessageRecord).filter(MessageRecord.session_id == session_id).order_by(MessageRecord.id.asc()).all()
 
 
 def serialize_messages(messages: list[MessageRecord]) -> list[dict[str, str]]:
@@ -68,10 +62,7 @@ def serialize_messages(messages: list[MessageRecord]) -> list[dict[str, str]]:
 
 def list_session_artifacts(db, session_id: int) -> list[ArtifactRecord]:
     return (
-        db.query(ArtifactRecord)
-        .filter(ArtifactRecord.session_id == session_id)
-        .order_by(ArtifactRecord.id.asc())
-        .all()
+        db.query(ArtifactRecord).filter(ArtifactRecord.session_id == session_id).order_by(ArtifactRecord.id.asc()).all()
     )
 
 
@@ -95,7 +86,7 @@ def _artifact_record_to_view(artifact: ArtifactRecord) -> ArtifactView:
 def create_provider() -> ChatProvider:
     try:
         return GroqProvider()
-    except RuntimeError as exc:
+    except RuntimeError:
         return LocalProvider()
 
 
@@ -180,11 +171,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         session = get_session_or_404(db, payload.token)
         existing_messages = list_session_messages(db, session.id)
 
-        if (
-            session.mode == "receive"
-            and session.state == "present_choices"
-            and content in RECEIVE_SELECTIONS
-        ):
+        if session.mode == "receive" and session.state == "present_choices" and content in RECEIVE_SELECTIONS:
             updated_artifact = repo.update_latest_artifact_metadata(
                 session_id=session.id,
                 artifact_type="receive_choice",

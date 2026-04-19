@@ -1,5 +1,4 @@
 import pytest
-
 from app.state_machine import FLOW, next_state
 
 
@@ -26,9 +25,7 @@ def test_all_transition_targets_are_valid_states_in_the_same_mode():
 
 def test_only_expected_terminal_self_loops_exist():
     terminal_self_loops = {
-        mode: sorted(
-            state for state, next_state_name in transitions.items() if state == next_state_name
-        )
+        mode: sorted(state for state, next_state_name in transitions.items() if state == next_state_name)
         for mode, transitions in FLOW.items()
     }
 

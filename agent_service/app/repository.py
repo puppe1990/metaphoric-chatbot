@@ -3,11 +3,9 @@ from __future__ import annotations
 import secrets
 from collections.abc import Mapping
 
-from sqlalchemy.exc import IntegrityError
-
 from app.models import ArtifactRecord, SessionRecord
 from app.schemas import ArtifactMetadata
-
+from sqlalchemy.exc import IntegrityError
 
 DEFAULT_STATE_BY_MODE = {
     "receive": "intake_problem",
@@ -86,12 +84,8 @@ class SessionRepository:
             return None
 
         current_metadata = record.get_metadata() or {}
-        metadata_updates = (
-            metadata.model_dump() if isinstance(metadata, ArtifactMetadata) else dict(metadata)
-        )
-        updated_metadata = ArtifactMetadata.model_validate(
-            {**current_metadata, **metadata_updates}
-        ).model_dump()
+        metadata_updates = metadata.model_dump() if isinstance(metadata, ArtifactMetadata) else dict(metadata)
+        updated_metadata = ArtifactMetadata.model_validate({**current_metadata, **metadata_updates}).model_dump()
         record.set_metadata(updated_metadata)
         self.db.add(record)
         self.db.flush()

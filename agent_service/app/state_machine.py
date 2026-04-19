@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Final
 
-
 FLOW: Final[dict[str, dict[str, str]]] = {
     "receive": {
         "intake_problem": "generate_candidates",
@@ -31,6 +30,4 @@ def next_state(mode: str, current_state: str) -> str:
     try:
         return mode_flow[current_state]
     except KeyError as exc:
-        raise ValueError(
-            f"Unsupported state {current_state!r} for mode {mode!r}"
-        ) from exc
+        raise ValueError(f"Unsupported state {current_state!r} for mode {mode!r}") from exc
