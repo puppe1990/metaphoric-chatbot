@@ -106,7 +106,7 @@ class SessionRepository:
             raise ValueError(f"Unsupported session context fields: {', '.join(unknown_fields)}")
 
         try:
-            validated_context = SessionContextUpdate.model_validate(dict(context)).model_dump()
+            validated_context = SessionContextUpdate.model_validate(dict(context)).model_dump(exclude_unset=True)
         except ValidationError as exc:
             raise ValueError(f"Invalid session context payload: {exc}") from exc
 
