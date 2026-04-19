@@ -32,7 +32,9 @@ describe("ChatShell", () => {
     expect(screen.getByRole("button", { name: "O que está travando?" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Onde a tensão aparece?" })).toBeInTheDocument();
     expect(
-      screen.getByText("Descreva o problema em uma frase. Se eu tiver contexto suficiente, já te mostro 3 caminhos."),
+      screen.getByText(
+        "Descreva o problema em uma frase. Se eu tiver contexto suficiente, já te mostro mundos simbólicos para desenvolver sua metáfora.",
+      ),
     ).toBeInTheDocument();
 
     const input = screen.getByLabelText("Message input");
@@ -222,13 +224,15 @@ describe("ChatShell", () => {
           content: "Mensagem antiga que nao deve ser usada para pareamento.",
           metadata: {
             clarifier_asked: false,
-            internal_candidate_count: 3,
+            internal_candidate_count: 5,
             selected_option: null,
           },
           choices: [
             { label: "A", text: "Uma ponte oscilando no vento." },
             { label: "B", text: "Um motor girando sem engatar." },
             { label: "C", text: "Uma porta pesada que quase cede." },
+            { label: "D", text: "Um mapa cheio de desvios." },
+            { label: "E", text: "Uma caldeira perto do limite." },
           ],
         },
       ],
@@ -254,6 +258,10 @@ describe("ChatShell", () => {
     expect(
       within(latestAssistantMessage).getByRole("button", { name: "C Uma porta pesada que quase cede." }),
     ).toBeInTheDocument();
+    expect(within(latestAssistantMessage).getByRole("button", { name: "D Um mapa cheio de desvios." })).toBeInTheDocument();
+    expect(
+      within(latestAssistantMessage).getByRole("button", { name: "E Uma caldeira perto do limite." }),
+    ).toBeInTheDocument();
   });
 
   it("hides stale receive-choice artifacts after a selection was made during refinement", () => {
@@ -274,13 +282,15 @@ describe("ChatShell", () => {
           content: "Escolha a imagem que melhor descreve seu momento.",
           metadata: {
             clarifier_asked: false,
-            internal_candidate_count: 3,
+            internal_candidate_count: 5,
             selected_option: "B",
           },
           choices: [
             { label: "A", text: "Uma ponte oscilando no vento." },
             { label: "B", text: "Um motor girando sem engatar." },
             { label: "C", text: "Uma porta pesada que quase cede." },
+            { label: "D", text: "Um mapa cheio de desvios." },
+            { label: "E", text: "Uma caldeira perto do limite." },
           ],
         },
       ],
@@ -303,6 +313,8 @@ describe("ChatShell", () => {
     expect(
       within(refinementPrompt).queryByRole("button", { name: "C Uma porta pesada que quase cede." }),
     ).toBeNull();
+    expect(within(refinementPrompt).queryByRole("button", { name: "D Um mapa cheio de desvios." })).toBeNull();
+    expect(within(refinementPrompt).queryByRole("button", { name: "E Uma caldeira perto do limite." })).toBeNull();
     expect(screen.queryByRole("button", { name: "A Uma ponte oscilando no vento." })).toBeNull();
   });
 
@@ -328,13 +340,15 @@ describe("ChatShell", () => {
           content: "Escolha a imagem que melhor descreve seu momento.",
           metadata: {
             clarifier_asked: false,
-            internal_candidate_count: 3,
+            internal_candidate_count: 5,
             selected_option: null,
           },
           choices: [
             { label: "A", text: "Uma ponte oscilando no vento." },
             { label: "B", text: "Um motor girando sem engatar." },
             { label: "C", text: "Uma porta pesada que quase cede." },
+            { label: "D", text: "Um mapa cheio de desvios." },
+            { label: "E", text: "Uma caldeira perto do limite." },
           ],
         },
       ],

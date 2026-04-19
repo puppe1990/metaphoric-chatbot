@@ -34,7 +34,7 @@ export function MessageList({
   artifacts?: ChatArtifact[];
   disabled?: boolean;
   isThinking?: boolean;
-  onChoiceSelect?: (label: "A" | "B" | "C") => void;
+  onChoiceSelect?: (label: "A" | "B" | "C" | "D" | "E") => void;
 }) {
   const receiveChoiceArtifact = [...artifacts].reverse().find(
     (artifact) => isReceiveChoiceArtifact(artifact) && artifact.metadata?.selected_option == null,

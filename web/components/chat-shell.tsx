@@ -40,7 +40,7 @@ export function ChatShell({
   const [draft, setDraft] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
-  const pendingChoiceSubmitRef = useRef<"A" | "B" | "C" | null>(null);
+  const pendingChoiceSubmitRef = useRef<"A" | "B" | "C" | "D" | "E" | null>(null);
   const value = inputValue ?? draft;
 
   const updateValue = (nextValue: string) => {
@@ -68,7 +68,7 @@ export function ChatShell({
     }
   };
 
-  const handleChoiceSelect = (label: "A" | "B" | "C") => {
+  const handleChoiceSelect = (label: "A" | "B" | "C" | "D" | "E") => {
     if (inputDisabled) {
       return;
     }
@@ -159,7 +159,7 @@ export function ChatShell({
                 formRef={formRef}
                 helperText={
                   session.mode === "receive"
-                    ? "Descreva o problema em uma frase. Se eu tiver contexto suficiente, já te mostro 3 caminhos."
+                    ? "Descreva o problema em uma frase. Se eu tiver contexto suficiente, já te mostro mundos simbólicos para desenvolver sua metáfora."
                     : "Envie sua resposta para avançar o estado guiado desta conversa."
                 }
                 onChange={handleChange}
@@ -167,7 +167,7 @@ export function ChatShell({
                 onSubmit={handleSubmit}
                 placeholder={
                   session.mode === "build"
-                    ? "Ex.: uma porta emperrada, um espelho riscado..."
+                    ? "Ex.: isso parece mais raiz, batalha, caminho, engrenagem ou pressão..."
                     : "Ex.: o projeto trava quando precisa decidir..."
                 }
                 suggestions={session.suggestions}

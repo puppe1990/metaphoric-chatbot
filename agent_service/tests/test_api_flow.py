@@ -97,15 +97,19 @@ def test_message_endpoint_persists_transcript_and_advances_state(tmp_path, monke
         },
     ]
     assert artifact["artifact_type"] == "receive_choice"
-    assert artifact["content"] == body["messages"][-1]["content"]
+    assert body["messages"][-1]["content"] == (
+        "Para achar sua metáfora, veja qual desses mundos encaixa melhor. "
+        "Se algum encaixar, eu desenvolvo por esse caminho."
+    )
+    assert artifact["content"] != body["messages"][-1]["content"]
     assert artifact["metadata"] == {
         "clarifier_asked": False,
-        "internal_candidate_count": 3,
+        "internal_candidate_count": 5,
         "selected_option": None,
     }
-    assert [choice["label"] for choice in artifact["choices"]] == ["A", "B", "C"]
+    assert [choice["label"] for choice in artifact["choices"]] == ["A", "B", "C", "D", "E"]
     assert all(choice["text"] for choice in artifact["choices"])
-    assert "possibilidades" in body["messages"][-1]["content"].lower()
+    assert "mundo" in body["messages"][-1]["content"].lower()
     assert "Escolha A, B ou C" not in body["messages"][-1]["content"]
     assistant_messages = [message["content"] for message in body["messages"] if message["role"] == "assistant"]
     assert "Qual é a sensação dominante nisso?" not in assistant_messages
@@ -146,7 +150,7 @@ def test_message_endpoint_selects_receive_choice_and_enters_refinement(tmp_path,
     }
     assert body["artifacts"][0]["metadata"] == {
         "clarifier_asked": False,
-        "internal_candidate_count": 3,
+        "internal_candidate_count": 5,
         "selected_option": "B",
     }
 
@@ -321,8 +325,8 @@ def test_message_endpoint_uses_local_fallback_when_provider_is_not_configured(tm
     body = response.json()
     assert body["state"] == "present_choices"
     assert body["artifacts"][0]["artifact_type"] == "receive_choice"
-    assert [choice["label"] for choice in body["artifacts"][0]["choices"]] == ["A", "B", "C"]
-    assert "possibilidades" in body["messages"][-1]["content"].lower()
+    assert [choice["label"] for choice in body["artifacts"][0]["choices"]] == ["A", "B", "C", "D", "E"]
+    assert "mundo" in body["messages"][-1]["content"].lower()
     assert "Escolha A, B ou C" not in body["messages"][-1]["content"]
 
 
@@ -348,13 +352,19 @@ def test_message_endpoint_normalizes_malformed_receive_choices_into_safe_artifac
     assert body["artifacts"][0]["artifact_type"] == "receive_choice"
     assert body["artifacts"][0]["metadata"] == {
         "clarifier_asked": False,
-        "internal_candidate_count": 3,
+        "internal_candidate_count": 5,
         "selected_option": None,
     }
-    assert [choice["label"] for choice in body["artifacts"][0]["choices"]] == ["A", "B", "C"]
-    assert "A." in body["messages"][-1]["content"]
-    assert "B." in body["messages"][-1]["content"]
-    assert "C." in body["messages"][-1]["content"]
+    assert [choice["label"] for choice in body["artifacts"][0]["choices"]] == ["A", "B", "C", "D", "E"]
+    assert body["messages"][-1]["content"] == (
+        "Para achar sua metáfora, veja qual desses mundos encaixa melhor. "
+        "Se algum encaixar, eu desenvolvo por esse caminho."
+    )
+    assert "A." in body["artifacts"][0]["content"]
+    assert "B." in body["artifacts"][0]["content"]
+    assert "C." in body["artifacts"][0]["content"]
+    assert "D." in body["artifacts"][0]["content"]
+    assert "E." in body["artifacts"][0]["content"]
     assistant_messages = [message["content"] for message in body["messages"] if message["role"] == "assistant"]
     assert "Qual é a sensação dominante nisso?" not in assistant_messages
     assert "Que mudança você gostaria de sentir ao final desta metáfora?" not in assistant_messages
@@ -490,7 +500,7 @@ def test_build_assistant_message_finalizes_receive_when_image_has_enough_materia
         user_input=(
             "assistant: Descreva o problema em uma frase simples.\n"
             "user: Sei o que quero, mas fico adiando.\n"
-            "assistant: Aqui vao tres possibilidades para seguir nessa imagem.\n"
+            "assistant: Para achar sua metáfora, veja em qual mundo isso se encaixa melhor.\n"
             "user: C\n"
             "assistant: Boa. Agora diga como voce quer ajustar essa opcao.\n"
             "user: mais poetica\n"
@@ -593,6 +603,7 @@ def test_interpret_turn_falls_back_deterministically_when_provider_raises():
     ("user_input", "expected_intent"),
     [
         ("assistant: Escolha a imagem que mais acerta o problema agora.\nuser: B", "agent_option_selection"),
+        ("assistant: Escolha a imagem que mais acerta o problema agora.\nuser: E", "agent_option_selection"),
         (
             "assistant: Escolha a imagem que mais acerta o problema agora.\nuser: um barco perdido no oceano",
             "user_introduced_metaphor",
@@ -655,9 +666,9 @@ def test_generate_contextual_choices_for_estou_preso_stays_in_stuck_semantic_fie
 
     choice_texts = [choice.text.lower() for choice in artifact.choices]
     joined = " ".join(choice_texts)
-    assert "carro girando em falso na lama" not in joined
-    assert "gaveta emperrada" not in joined
-    assert "três rádios ligados ao mesmo tempo" not in joined
+    assert "natureza: plantio" not in joined
+    assert "guerra / estratégia" not in joined
+    assert "jornada / viagem" not in joined
     assert any("pres" in text or "trav" in text or "bloque" in text for text in choice_texts)
 
 
@@ -682,6 +693,7 @@ def test_generate_contextual_choices_avoids_rigid_quiz_framing():
 
     assert "Escolha A, B ou C" not in artifact.content
     assert "escolha a imagem" not in artifact.content.lower()
+    assert "em qual desses mundos isso se encaixa" in artifact.content.lower()
 
 
 def test_generate_contextual_choices_preserves_user_metaphor_field():
@@ -692,9 +704,9 @@ def test_generate_contextual_choices_preserves_user_metaphor_field():
 
     joined = " ".join(choice.text.lower() for choice in artifact.choices)
     assert "barco" in joined or "oceano" in joined
-    assert "carro girando em falso na lama" not in joined
-    assert "gaveta emperrada" not in joined
-    assert "três rádios ligados ao mesmo tempo" not in joined
+    assert "natureza: plantio" not in joined
+    assert "guerra / estratégia" not in joined
+    assert "energia / física" not in joined
 
 
 def test_hydrate_receive_choice_artifact_preserves_contextual_copy():
@@ -706,3 +718,4 @@ def test_hydrate_receive_choice_artifact_preserves_contextual_copy():
 
     assert hydrated.content == artifact.content
     assert "Escolha A, B ou C" not in hydrated.content
+    assert "em qual desses mundos isso se encaixa" in hydrated.content.lower()

@@ -36,7 +36,7 @@ class LocalProvider:
         if system_prompt == TURN_INTERPRETER_PROMPT:
             latest = self._latest_user_line(user_prompt)
             latest_normalized = latest.strip().lower()
-            if latest.upper() in {"A", "B", "C"}:
+            if latest.upper() in {"A", "B", "C", "D", "E"}:
                 return (
                     '{"intent":"agent_option_selection","active_metaphor_seed":null,'
                     '"sensory_mode":null,"suggestion_basis":"literal-choice"}'
@@ -100,12 +100,16 @@ class LocalProvider:
                     "A. Como um barco sem bússola rodando em círculos no mesmo trecho do oceano.\n"
                     "B. Como um casco pequeno apanhando de ondas grandes sem ver a costa.\n"
                     "C. Como um barco perdido sob neblina, ouvindo o mar mas sem achar direção.\n"
+                    "D. Como uma rota marítima longa demais para ser lida sem mapa.\n"
+                    "E. Como maré puxando para lados diferentes ao mesmo tempo.\n"
                 )
             if self._has_stuck_language(latest):
                 return (
                     "A. Como um corredor estreito entupido de caixas.\n"
                     "B. Como um motor que gira e não engata.\n"
                     "C. Como água presa atrás de uma comporta.\n"
+                    "D. Como uma engrenagem travada segurando a máquina toda.\n"
+                    "E. Como pressão acumulada sem conseguir sair.\n"
                 )
             return self._contextual_choices_response(user_prompt)
 
@@ -169,24 +173,21 @@ class LocalProvider:
             f"B. Como uma gaveta emperrada: você puxa, hesita, solta, e tudo fica preso no meio em {scene}.\n"
             "C. Como três rádios ligados ao mesmo tempo: sinais disputam espaço "
             f"e nenhuma música consegue abrir caminho em {scene}.\n"
-            "Escolha A, B ou C."
+            f"D. Como uma ponte longa demais para atravessar sem mapa em {scene}.\n"
+            f"E. Como uma caldeira acumulando pressão por dentro em {scene}.\n"
+            "Escolha uma opção para eu desenvolver."
         )
 
     def _contextual_choices_response(self, user_prompt: str) -> str:
-        user_lines = [
-            line.split(":", 1)[1].strip()
-            for line in user_prompt.splitlines()
-            if line.lower().startswith("user:") and ":" in line
-        ]
-        latest = user_lines[-1] if user_lines else user_prompt.strip()
-        scene = latest.rstrip(".!?") or "isso"
-
         return (
-            "A. Como um carro girando em falso na lama: faz barulho, força o motor, mas não sai do lugar em "
-            f"{scene}.\n"
-            f"B. Como uma gaveta emperrada: você puxa, hesita, solta, e tudo fica preso no meio em {scene}.\n"
-            "C. Como três rádios ligados ao mesmo tempo: sinais disputam espaço "
-            f"e nenhuma música consegue abrir caminho em {scene}.\n"
+            "Para achar sua metáfora, veja em qual mundo isso se encaixa melhor:\n"
+            "A. Natureza: plantio, colheita, raiz, crescimento.\n"
+            "B. Guerra / estratégia: batalha, território, ataque, defesa.\n"
+            "C. Jornada / viagem: caminho, mapa, destino.\n"
+            "D. Máquina / engenharia: sistema, engrenagem, processo.\n"
+            "E. Energia / física: calor, pressão, força.\n"
+            "Se algum desses mundos encaixar, eu desenvolvo a metáfora por esse caminho.\n"
+            "Quando travar, pense: em qual desses mundos isso se encaixa?\n"
         )
 
     def _receive_final_response(self, user_prompt: str) -> str:

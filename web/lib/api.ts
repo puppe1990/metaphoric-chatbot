@@ -39,14 +39,14 @@ export class AgentRequestError extends Error {
 export const RECEIVE_CHOICE_ARTIFACT_TYPE = "receive_choice";
 
 export type MetaphorChoice = {
-  label: "A" | "B" | "C";
+  label: "A" | "B" | "C" | "D" | "E";
   text: string;
 };
 
 export type ArtifactMetadata = {
   clarifier_asked: boolean;
   internal_candidate_count: number;
-  selected_option: "A" | "B" | "C" | null;
+  selected_option: "A" | "B" | "C" | "D" | "E" | null;
 };
 
 type BaseChatArtifact = {
@@ -156,12 +156,26 @@ const SUGGESTIONS_BY_MODE_AND_STATE: Record<ChatMode, Record<string, string[]>> 
       "Tenho uma ideia, mas ela fica confusa.",
     ],
     identify_core_conflict: ["Desejo versus medo.", "Pressa versus clareza.", "Controle versus espontaneidade."],
-    offer_symbolic_fields: ["Um macaco bagunceiro.", "Um motor acelerado.", "Uma bússola girando."],
-    user_selects_symbol: ["Um macaco bagunceiro.", "Um motor acelerado.", "Uma porta emperrada."],
+    offer_symbolic_fields: [
+      "Natureza: plantio, colheita, raiz, crescimento.",
+      "Guerra / estratégia: batalha, território, ataque, defesa.",
+      "Jornada / viagem: caminho, mapa, destino.",
+      "Máquina / engenharia: sistema, engrenagem, processo.",
+      "Energia / física: calor, pressão, força.",
+    ],
+    user_selects_symbol: [
+      "Quero ir por natureza.",
+      "Quero ir por guerra / estratégia.",
+      "Quero ir por jornada / viagem.",
+      "Quero ir por máquina / engenharia.",
+      "Quero ir por energia / física.",
+    ],
     user_attempt: [
-      "Parece um macaco que aparece e quer estragar tudo.",
-      "Parece um motor acelerado sem direção.",
-      "Parece uma porta que eu forço e ela trava mais.",
+      "Isso parece uma raiz tentando firmar espaço em chão ruim.",
+      "Isso parece uma batalha em que eu gasto energia cedo demais.",
+      "Isso parece um caminho sem mapa claro.",
+      "Isso parece um sistema rodando, mas sem encaixar direito.",
+      "Isso parece pressão acumulando sem virar movimento.",
     ],
     coach_feedback: ["Quero deixar mais concreto.", "Quero menos clichê.", "Quero mais movimento."],
     rewrite_together: ["Mais curto.", "Mais estranho.", "Mais claro."],

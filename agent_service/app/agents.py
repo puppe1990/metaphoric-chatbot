@@ -15,10 +15,10 @@ from .prompts import (
     TURN_INTERPRETER_PROMPT,
 )
 from .providers.base import ChatProvider
-from .schemas import ArtifactMetadata, ArtifactView, MetaphorChoice, TurnIntent
+from .schemas import ArtifactMetadata, ArtifactView, ChoiceLabel, MetaphorChoice, TurnIntent
 
-CHOICE_LABELS = ("A", "B", "C")
-CHOICE_PATTERN = re.compile(r"(?ims)^\s*([ABC])\s*[\.\):-]\s*(.+?)(?=^\s*[ABC]\s*[\.\):-]\s*|\Z)")
+CHOICE_LABELS: tuple[ChoiceLabel, ...] = ("A", "B", "C", "D", "E")
+CHOICE_PATTERN = re.compile(r"(?ims)^\s*([A-E])\s*[\.\):-]\s*(.+?)(?=^\s*[A-E]\s*[\.\):-]\s*|\Z)")
 
 
 class TurnInterpretation(BaseModel):
@@ -129,13 +129,12 @@ def _parse_receive_choices(raw_output: str) -> list[MetaphorChoice] | None:
 def _normalize_choice_text(text: str) -> str:
     compact = " ".join(line.strip() for line in text.strip().splitlines() if line.strip())
     compact = re.sub(r"\s+", " ", compact)
-    compact = re.sub(r"\s*Escolha\s+A,\s*B\s+ou\s+C\.?\s*$", "", compact, flags=re.IGNORECASE)
+    compact = re.sub(r"\s*Escolha\s+[A-E](?:,\s*[A-E])*(?:\s+ou\s+[A-E])?\.?\s*$", "", compact, flags=re.IGNORECASE)
     return compact.strip(" -")
 
 
 def _fallback_receive_choices(user_input: str) -> list[MetaphorChoice]:
     problem = _latest_user_problem(user_input).rstrip(".!?")
-    scene = problem or "isso"
     normalized_problem = problem.lower()
 
     if _has_sea_metaphor_language(normalized_problem):
@@ -150,24 +149,16 @@ def _fallback_receive_choices(user_input: str) -> list[MetaphorChoice]:
             MetaphorChoice(label="A", text="Como um corredor estreito entupido de caixas."),
             MetaphorChoice(label="B", text="Como um motor que gira e nao engata."),
             MetaphorChoice(label="C", text="Como agua presa atras de uma comporta."),
+            MetaphorChoice(label="D", text="Como uma corrente segurando o avanço no meio da travessia."),
+            MetaphorChoice(label="E", text="Como pressão acumulada sem uma válvula de escape."),
         ]
 
     return [
-        MetaphorChoice(
-            label="A",
-            text=f"Como um carro girando em falso na lama: faz força demais e ainda assim não sai do lugar em {scene}.",
-        ),
-        MetaphorChoice(
-            label="B",
-            text=f"Como uma gaveta emperrada: você puxa, hesita, solta, e tudo fica preso no meio em {scene}.",
-        ),
-        MetaphorChoice(
-            label="C",
-            text=(
-                "Como três rádios ligados ao mesmo tempo: sinais disputam espaço "
-                f"e nenhuma música consegue abrir caminho em {scene}."
-            ),
-        ),
+        MetaphorChoice(label="A", text="Natureza: plantio, colheita, raiz, crescimento."),
+        MetaphorChoice(label="B", text="Guerra / estratégia: batalha, território, ataque, defesa."),
+        MetaphorChoice(label="C", text="Jornada / viagem: caminho, mapa, destino."),
+        MetaphorChoice(label="D", text="Máquina / engenharia: sistema, engrenagem, processo."),
+        MetaphorChoice(label="E", text="Energia / física: calor, pressão, força."),
     ]
 
 
@@ -373,18 +364,23 @@ def _has_sea_metaphor_language(normalized: str) -> bool:
 
 def _is_contextual_choice_content(content: str) -> bool:
     lowered = content.lower()
-    return "aqui vao tres possibilidades" in lowered and "escolha a imagem" not in lowered
+    return (
+        "para achar sua metáfora" in lowered
+        or "para achar sua metafora" in lowered
+        or ("aqui vao tres possibilidades" in lowered and "escolha a imagem" not in lowered)
+    )
 
 
 def _format_receive_choices_content(choices: list[MetaphorChoice]) -> str:
     lines = ["Escolha a imagem que mais acerta o problema agora:"]
     lines.extend(f"{choice.label}. {choice.text}" for choice in choices)
-    lines.append("Escolha A, B ou C.")
+    lines.append("Escolha uma opção para eu desenvolver.")
     return "\n".join(lines)
 
 
 def _format_contextual_choices_content(choices: list[MetaphorChoice]) -> str:
-    lines = ["Aqui vao tres possibilidades para seguir nessa imagem:"]
+    lines = ["Para achar sua metáfora, veja em qual mundo isso se encaixa melhor:"]
     lines.extend(f"{choice.label}. {choice.text}" for choice in choices)
-    lines.append("Se alguma acertar, eu desenvolvo por esse caminho.")
+    lines.append("Se algum desses mundos encaixar, eu desenvolvo a metáfora por esse caminho.")
+    lines.append("Quando travar, pense: em qual desses mundos isso se encaixa?")
     return "\n".join(lines)

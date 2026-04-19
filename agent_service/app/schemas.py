@@ -13,15 +13,18 @@ TurnIntent = Literal[
 ]
 
 
+ChoiceLabel = Literal["A", "B", "C", "D", "E"]
+
+
 class MetaphorChoice(BaseModel):
-    label: Literal["A", "B", "C"]
+    label: ChoiceLabel
     text: str = Field(min_length=1)
 
 
 class ArtifactMetadata(BaseModel):
     clarifier_asked: bool = False
     internal_candidate_count: int = 0
-    selected_option: Literal["A", "B", "C"] | None = None
+    selected_option: ChoiceLabel | None = None
 
 
 class ArtifactView(BaseModel):

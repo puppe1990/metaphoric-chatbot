@@ -18,6 +18,11 @@ START_PROMPT_BY_MODE = {
     "build": "Descreva o problema em uma frase simples.",
 }
 
+RECEIVE_SYMBOLIC_GUIDE_MESSAGE = (
+    "Para achar sua metáfora, veja qual desses mundos encaixa melhor. "
+    "Se algum encaixar, eu desenvolvo por esse caminho."
+)
+
 REFINE_SELECTED_MESSAGE = (
     "Boa. Agora diga como você quer ajustar essa opção: mais curta, mais concreta, mais poética ou mais direta."
 )
@@ -43,7 +48,7 @@ def build_assistant_message(
             provider = provider_factory()
             artifact = generate_contextual_choices(provider, user_input)
             interpretation = interpret_turn(provider, current_state=state, user_input=user_input)
-            return "present_choices", artifact.content, [artifact], interpretation
+            return "present_choices", RECEIVE_SYMBOLIC_GUIDE_MESSAGE, [artifact], interpretation
         if state in {"present_choices", "refine_selected"}:
             provider = provider_factory()
             interpretation = interpret_turn(provider, current_state=state, user_input=user_input)
@@ -54,7 +59,7 @@ def build_assistant_message(
             if interpretation.intent in {"user_introduced_metaphor", "refinement_request", "problem_statement"}:
                 return "refine_selected", coach_metaphor(provider, user_input), [], interpretation
             artifact = generate_contextual_choices(provider, user_input)
-            return "present_choices", artifact.content, [artifact], interpretation
+            return "present_choices", RECEIVE_SYMBOLIC_GUIDE_MESSAGE, [artifact], interpretation
 
     if mode == "build":
         if state == "intake_problem":
@@ -64,8 +69,10 @@ def build_assistant_message(
         if state == "offer_symbolic_fields":
             return (
                 state,
-                "Isso parece mais uma porta emperrada, um rio barrado, uma engrenagem "
-                "presa, um motor acelerado ou uma bússola girando?",
+                (
+                    "Isso se encaixa mais em natureza, guerra/estratégia, "
+                    "jornada/viagem, máquina/engenharia ou energia/física?"
+                ),
                 [],
                 None,
             )

@@ -23,7 +23,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-RECEIVE_SELECTIONS = {"A", "B", "C"}
+RECEIVE_SELECTIONS = {"A", "B", "C", "D", "E"}
 
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",

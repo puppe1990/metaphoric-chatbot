@@ -69,15 +69,19 @@ Rules:
 - short rewrite asks like "mais curta", "mais concreta", "mais direta",
   "reescreve" and "ajusta isso" are refinement_request
 - replies like "não sei", "sei lá", "tanto faz", "talvez", "não tenho certeza" are ambiguous
-- if the user literally answers A, B, or C, use agent_option_selection
+- if the user literally answers A, B, C, D, or E, use agent_option_selection
 """
 
-RECEIVE_CONTEXTUAL_PROMPT = """You generate three contextual metaphor proposals from the user's language.
+RECEIVE_CONTEXTUAL_PROMPT = """You help the user find a symbolic world for their metaphor.
 Rules:
 - write in Brazilian Portuguese
-- derive from the user's most recent relevant words
-- preserve the user's symbolic field if one already exists
-- vary angle, pressure, movement, or perspective instead of changing theme randomly
-- keep each option short, concrete, image-based
-- do not force quiz framing
+- use exactly five options labeled A., B., C., D., and E.
+- use these worlds as the base:
+  A. Natureza: plantio, colheita, raiz, crescimento
+  B. Guerra / estratégia: batalha, território, ataque, defesa
+  C. Jornada / viagem: caminho, mapa, destino
+  D. Máquina / engenharia: sistema, engrenagem, processo
+  E. Energia / física: calor, pressão, força
+- do not hardcode random metaphor examples unrelated to these worlds
+- end by nudging the user to ask: "em qual desses mundos isso se encaixa?"
 """
