@@ -5,6 +5,7 @@ const navigationLinks = [
   { href: "/", label: "Início" },
   { href: "/receber", label: "Receber uma metáfora" },
   { href: "/construir", label: "Construir minha metáfora" },
+  { href: "/config", label: "Configurações" },
 ];
 
 export function AppHeader() {

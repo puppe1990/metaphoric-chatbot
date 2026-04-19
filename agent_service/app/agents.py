@@ -11,6 +11,7 @@ from .prompts import (
     GENERATOR_PROMPT,
     RECEIVE_CHOICES_PROMPT,
     RECEIVE_CONTEXTUAL_PROMPT,
+    RECEIVE_FINAL_PROMPT,
     TURN_INTERPRETER_PROMPT,
 )
 from .providers.base import ChatProvider
@@ -37,6 +38,10 @@ def generate_metaphor(provider: ChatProvider, user_input: str) -> str:
 
 def coach_metaphor(provider: ChatProvider, user_input: str) -> str:
     return provider.invoke_chat(COACH_PROMPT, user_input)
+
+
+def finalize_receive_metaphor(provider: ChatProvider, user_input: str) -> str:
+    return provider.invoke_chat(RECEIVE_FINAL_PROMPT, user_input)
 
 
 def interpret_turn(provider: ChatProvider, current_state: str, user_input: str) -> TurnInterpretation:
@@ -224,6 +229,24 @@ def _fallback_turn_interpretation(user_input: str) -> TurnInterpretation:
     )
 
 
+def should_finalize_receive_response(current_state: str, user_input: str, interpretation: TurnInterpretation) -> bool:
+    if current_state != "refine_selected":
+        return False
+
+    if interpretation.intent in {"agent_option_selection", "refinement_request", "ambiguous"}:
+        return False
+
+    substantive_lines = _collect_substantive_user_lines(user_input)
+    if len(substantive_lines) < 2:
+        return False
+
+    latest = substantive_lines[-1].strip()
+    if len(latest.split()) >= 4:
+        return True
+
+    return _looks_like_user_metaphor(latest.lower())
+
+
 def _is_ambiguous_reply(normalized: str) -> bool:
     return normalized in {
         "não sei",
@@ -257,6 +280,25 @@ def _is_refinement_request(normalized: str) -> bool:
     if normalized in direct_markers:
         return True
     return bool(re.match(r"^(reescreve|reescrever|ajusta)\b", normalized, flags=re.IGNORECASE))
+
+
+def _collect_substantive_user_lines(user_input: str) -> list[str]:
+    user_lines = [
+        line.split(":", 1)[1].strip()
+        for line in user_input.splitlines()
+        if line.lower().startswith("user:") and ":" in line
+    ]
+    substantive: list[str] = []
+    for line in user_lines:
+        normalized = line.strip().lower()
+        if not normalized:
+            continue
+        if line.upper() in CHOICE_LABELS:
+            continue
+        if _is_refinement_request(normalized) or _is_ambiguous_reply(normalized):
+            continue
+        substantive.append(line)
+    return substantive
 
 
 def _looks_like_user_metaphor(normalized: str) -> bool:

@@ -7,21 +7,56 @@ from pathlib import Path
 from app.agents import hydrate_receive_choice_artifact
 from app.config import get_allowed_origins, load_environment_file
 from app.db import SessionLocal, init_db
-from app.models import ArtifactRecord, MessageRecord, SessionRecord
+from app.models import ArtifactRecord, MessageRecord, SessionRecord, SettingRecord
 from app.orchestrator import (
     advance_mode,
     build_assistant_message,
     start_assistant_message,
 )
 from app.providers.base import ChatProvider
-from app.providers.groq_provider import GroqProvider
+from app.providers.groq_provider import GroqProvider, RateLimitError
 from app.providers.local_provider import LocalProvider
+from app.providers.nvidia_provider import NvidiaProvider
 from app.repository import SessionRepository
 from app.schemas import ArtifactView, ChatResponse, MessageRequest, StartSessionRequest
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 RECEIVE_SELECTIONS = {"A", "B", "C"}
+
+GROQ_MODELS = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-70b-versatile",
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768",
+    "gemma2-9b-it",
+]
+
+NVIDIA_MODELS = [
+    "meta/llama-3.3-70b-instruct",
+    "meta/llama-3.1-405b-instruct",
+    "meta/llama-3.1-70b-instruct",
+    "meta/llama-3.1-8b-instruct",
+    "nvidia/llama-3.3-nemotron-super-49b-v1",
+    "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    "nvidia/llama-3.1-nemotron-nano-8b-v1",
+    "mistralai/mistral-large",
+    "mistralai/mixtral-8x22b-instruct",
+    "mistralai/mixtral-8x7b-instruct",
+    "mistralai/mistral-7b-instruct-v0.3",
+    "microsoft/phi-3-medium-128k-instruct",
+    "microsoft/phi-4-mini-instruct",
+    "google/gemma-2-27b-it",
+    "qwen/qwen2.5-coder-32b-instruct",
+    "deepseek-ai/deepseek-r1",
+    "moonshotai/kimi-k2-instruct",
+]
+
+
+class ProviderConfig(BaseModel):
+    provider: str = "groq"
+    model: str = "llama-3.3-70b-versatile"
 
 
 def get_default_database_url() -> str:
@@ -82,11 +117,46 @@ def _artifact_record_to_view(artifact: ArtifactRecord) -> ArtifactView:
     )
 
 
-def create_provider() -> ChatProvider:
+def _load_provider_config(db) -> ProviderConfig:
+    rows = db.query(SettingRecord).filter(SettingRecord.key.in_(["provider", "model"])).all()
+    settings = {r.key: r.value for r in rows}
+    return ProviderConfig(
+        provider=settings.get("provider", "groq"),
+        model=settings.get("model", "llama-3.3-70b-versatile"),
+    )
+
+
+def _save_provider_config(db, config: ProviderConfig) -> None:
+    for key, value in [("provider", config.provider), ("model", config.model)]:
+        row = db.query(SettingRecord).filter(SettingRecord.key == key).first()
+        if row:
+            row.value = value
+        else:
+            db.add(SettingRecord(key=key, value=value))
+    db.commit()
+
+
+def _build_provider(provider: str, model: str) -> ChatProvider:
+    if provider == "local":
+        return LocalProvider()
+    if provider == "nvidia":
+        try:
+            return NvidiaProvider(model=model)
+        except RuntimeError:
+            return LocalProvider()
     try:
-        return GroqProvider()
+        return GroqProvider(model=model)
     except RuntimeError:
         return LocalProvider()
+
+
+def create_provider() -> ChatProvider:
+    return _build_provider("groq", "llama-3.3-70b-versatile")
+
+
+def resolve_provider(db) -> ChatProvider:
+    cfg = _load_provider_config(db)
+    return _build_provider(cfg.provider, cfg.model)
 
 
 def build_contextual_user_input(messages: list[MessageRecord], content: str) -> str:
@@ -116,6 +186,25 @@ def create_app(database_url: str | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
     )
+
+    @app.get("/api/config")
+    def get_config(db=Depends(get_db)) -> dict[str, object]:
+        cfg = _load_provider_config(db)
+        return {
+            "provider": cfg.provider,
+            "model": cfg.model,
+            "groq_models": GROQ_MODELS,
+            "nvidia_models": NVIDIA_MODELS,
+        }
+
+    @app.post("/api/config")
+    def set_config(payload: ProviderConfig, db=Depends(get_db)) -> dict[str, object]:
+        if payload.provider == "groq" and payload.model not in GROQ_MODELS:
+            raise HTTPException(status_code=400, detail=f"Unknown model '{payload.model}'.")
+        if payload.provider == "nvidia" and payload.model not in NVIDIA_MODELS:
+            raise HTTPException(status_code=400, detail=f"Unknown NVIDIA model '{payload.model}'.")
+        _save_provider_config(db, payload)
+        return {"provider": payload.provider, "model": payload.model}
 
     @app.post("/api/chat/start", response_model=ChatResponse)
     def start_session(
@@ -170,17 +259,24 @@ def create_app(database_url: str | None = None) -> FastAPI:
         session = get_session_or_404(db, payload.token)
         existing_messages = list_session_messages(db, session.id)
 
-        next_state = advance_mode(session.mode, session.state)
+        prior_state = session.state
+        next_state = advance_mode(session.mode, prior_state)
         state_for_response = next_state
-        if session.mode == "receive" and session.state in {"present_choices", "refine_selected"}:
-            state_for_response = session.state
+        if session.mode == "receive" and prior_state in {"present_choices", "refine_selected"}:
+            state_for_response = prior_state
 
-        resolved_state, assistant_message, artifacts, interpretation = build_assistant_message(
-            mode=session.mode,
-            state=state_for_response,
-            user_input=build_contextual_user_input(existing_messages, content),
-            provider_factory=create_provider,
-        )
+        try:
+            resolved_state, assistant_message, artifacts, interpretation = build_assistant_message(
+                mode=session.mode,
+                state=state_for_response,
+                user_input=build_contextual_user_input(existing_messages, content),
+                provider_factory=lambda: resolve_provider(db),
+            )
+        except RateLimitError as exc:
+            raise HTTPException(
+                status_code=429,
+                detail="AI rate limit reached. Please wait a few minutes and try again.",
+            ) from exc
 
         db.add(
             MessageRecord(
@@ -192,16 +288,25 @@ def create_app(database_url: str | None = None) -> FastAPI:
         )
         session.state = resolved_state
         if interpretation is not None:
+            session_context: dict[str, str] = {
+                "last_user_intent": interpretation.intent,
+            }
+            if interpretation.active_metaphor_seed is not None:
+                session_context["active_metaphor_seed"] = interpretation.active_metaphor_seed
+            if interpretation.sensory_mode is not None:
+                session_context["sensory_mode"] = interpretation.sensory_mode
+            if interpretation.suggestion_basis is not None:
+                session_context["suggestion_basis"] = interpretation.suggestion_basis
             repo.update_session_context(
                 session_id=session.id,
-                context={
-                    "active_metaphor_seed": interpretation.active_metaphor_seed,
-                    "last_user_intent": interpretation.intent,
-                    "sensory_mode": interpretation.sensory_mode,
-                    "suggestion_basis": interpretation.suggestion_basis,
-                },
+                context=session_context,
             )
-            if interpretation.intent == "agent_option_selection" and content in RECEIVE_SELECTIONS:
+            if (
+                session.mode == "receive"
+                and prior_state in {"present_choices", "refine_selected"}
+                and interpretation.intent == "agent_option_selection"
+                and content in RECEIVE_SELECTIONS
+            ):
                 updated_artifact = repo.update_latest_artifact_metadata(
                     session_id=session.id,
                     artifact_type="receive_choice",

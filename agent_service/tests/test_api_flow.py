@@ -1,5 +1,7 @@
 import pytest
+from app.db import SessionLocal
 from app.main import create_app
+from app.models import SessionRecord
 from app.orchestrator import build_assistant_message
 from fastapi.testclient import TestClient
 
@@ -65,7 +67,7 @@ def test_get_session_returns_persisted_opening_message(tmp_path):
 def test_message_endpoint_persists_transcript_and_advances_state(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
-    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         started = client.post("/api/chat/start", json={"mode": "receive"})
@@ -117,7 +119,7 @@ def test_message_endpoint_persists_transcript_and_advances_state(tmp_path, monke
 def test_message_endpoint_selects_receive_choice_and_enters_refinement(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
-    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         started = client.post("/api/chat/start", json={"mode": "receive"})
@@ -152,7 +154,7 @@ def test_message_endpoint_selects_receive_choice_and_enters_refinement(tmp_path,
 def test_message_endpoint_promotes_user_image_to_active_metaphor_seed(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
-    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
@@ -173,7 +175,7 @@ def test_message_endpoint_promotes_user_image_to_active_metaphor_seed(tmp_path, 
 def test_message_endpoint_refinement_request_in_present_choices_skips_literal_selection(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
-    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
@@ -191,7 +193,7 @@ def test_message_endpoint_refinement_request_in_present_choices_skips_literal_se
 def test_message_endpoint_contextual_receive_suggestions_match_problem_language(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
-    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
@@ -206,7 +208,7 @@ def test_message_endpoint_contextual_receive_suggestions_match_problem_language(
 def test_message_endpoint_refinement_request_keeps_active_metaphor_context(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
-    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
@@ -215,6 +217,75 @@ def test_message_endpoint_refinement_request_keeps_active_metaphor_context(tmp_p
         response = client.post("/api/chat/message", json={"token": token, "content": "mais concreta"})
 
     assert response.status_code == 200
+    assert (
+        "barco" in response.json()["assistant_message"].lower()
+        or "oceano" in response.json()["assistant_message"].lower()
+    )
+
+
+def test_message_endpoint_receive_mode_converges_to_final_metaphor(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+
+    with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
+        token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
+        client.post("/api/chat/message", json={"token": token, "content": "Sei o que quero, mas fico adiando."})
+        client.post("/api/chat/message", json={"token": token, "content": "C"})
+        client.post("/api/chat/message", json={"token": token, "content": "mais poética"})
+        client.post("/api/chat/message", json={"token": token, "content": "uma luta no ringue"})
+        response = client.post(
+            "/api/chat/message",
+            json={"token": token, "content": "uma luta de anos entre uma voz suave e um chiado agressivo"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["state"] == "refine_selected"
+    assert "?" not in body["assistant_message"]
+    assert "luta" in body["assistant_message"].lower()
+    assert "chiado" in body["assistant_message"].lower()
+
+
+def test_message_endpoint_selection_without_existing_choice_artifact_stays_recoverable(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+
+    with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
+        token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
+        response = client.post("/api/chat/message", json={"token": token, "content": "A"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["state"] == "present_choices"
+    assert body["artifacts"][0]["artifact_type"] == "receive_choice"
+    assert body["artifacts"][0]["metadata"]["selected_option"] is None
+
+
+def test_message_endpoint_refinement_request_preserves_persisted_active_metaphor_seed(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+    database_url = f"sqlite:///{tmp_path}/api-flow.db"
+
+    with TestClient(create_app(database_url=database_url)) as client:
+        token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
+        client.post("/api/chat/message", json={"token": token, "content": "estou bloqueado"})
+        client.post("/api/chat/message", json={"token": token, "content": "um barco perdido no oceano"})
+        response = client.post("/api/chat/message", json={"token": token, "content": "mais concreta"})
+        restored = client.get(f"/api/chat/session/{token}")
+
+    session = SessionLocal()
+    try:
+        persisted = session.query(SessionRecord).filter_by(token=token).one()
+    finally:
+        session.close()
+
+    assert response.status_code == 200
+    assert restored.status_code == 200
+    assert restored.json()["state"] == "refine_selected"
+    assert persisted.active_metaphor_seed == "um barco perdido no oceano"
     assert (
         "barco" in response.json()["assistant_message"].lower()
         or "oceano" in response.json()["assistant_message"].lower()
@@ -235,7 +306,7 @@ def test_message_endpoint_rejects_blank_content(tmp_path):
 def test_message_endpoint_uses_local_fallback_when_provider_is_not_configured(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
-    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         started = client.post("/api/chat/start", json={"mode": "receive"})
@@ -260,7 +331,7 @@ def test_message_endpoint_normalizes_malformed_receive_choices_into_safe_artifac
         def invoke_chat(self, system_prompt: str, user_prompt: str) -> str:
             return "Uma gaveta emperrada sem rótulos nem três opções."
 
-    monkeypatch.setattr("app.main.create_provider", lambda: BrokenChoiceProvider())
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: BrokenChoiceProvider())
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         started = client.post("/api/chat/start", json={"mode": "receive"})
@@ -367,6 +438,32 @@ def test_build_fallback_coaching_uses_user_image_without_invalidating_it():
     assert not message.startswith("Use ")
     assert message.count("?") <= 1
     assert interpretation is None
+
+
+def test_build_assistant_message_finalizes_receive_when_image_has_enough_material():
+    state, message, artifacts, interpretation = build_assistant_message(
+        mode="receive",
+        state="refine_selected",
+        user_input=(
+            "assistant: Descreva o problema em uma frase simples.\n"
+            "user: Sei o que quero, mas fico adiando.\n"
+            "assistant: Aqui vao tres possibilidades para seguir nessa imagem.\n"
+            "user: C\n"
+            "assistant: Boa. Agora diga como voce quer ajustar essa opcao.\n"
+            "user: mais poetica\n"
+            "assistant: Entao o centro continua claro.\n"
+            "user: uma luta no ringue\n"
+            "assistant: O que essa imagem faz com a cena quando o conflito aparece?\n"
+            "user: uma luta de anos entre uma voz suave e um chiado agressivo"
+        ),
+        provider_factory=lambda: __import__("app.providers.local_provider", fromlist=["LocalProvider"]).LocalProvider(),
+    )
+
+    assert state == "refine_selected"
+    assert "?" not in message
+    assert "luta" in message.lower()
+    assert artifacts == []
+    assert interpretation is not None
 
 
 def test_interpret_turn_marks_user_metaphor_when_user_supplies_new_image():

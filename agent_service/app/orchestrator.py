@@ -5,8 +5,10 @@ from collections.abc import Callable
 from app.agents import (
     TurnInterpretation,
     coach_metaphor,
+    finalize_receive_metaphor,
     generate_contextual_choices,
     interpret_turn,
+    should_finalize_receive_response,
 )
 from app.schemas import ArtifactView
 from app.state_machine import next_state
@@ -47,7 +49,9 @@ def build_assistant_message(
             interpretation = interpret_turn(provider, current_state=state, user_input=user_input)
             if interpretation.intent == "agent_option_selection":
                 return "refine_selected", REFINE_SELECTED_MESSAGE, [], interpretation
-            if interpretation.intent in {"user_introduced_metaphor", "refinement_request"}:
+            if should_finalize_receive_response(state, user_input, interpretation):
+                return "refine_selected", finalize_receive_metaphor(provider, user_input), [], interpretation
+            if interpretation.intent in {"user_introduced_metaphor", "refinement_request", "problem_statement"}:
                 return "refine_selected", coach_metaphor(provider, user_input), [], interpretation
             artifact = generate_contextual_choices(provider, user_input)
             return "present_choices", artifact.content, [artifact], interpretation

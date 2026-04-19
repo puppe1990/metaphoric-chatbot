@@ -26,11 +26,20 @@ class GroqProvider:
             raise
 
     def invoke_chat(self, system_prompt: str, user_prompt: str) -> str:
-        result = self._chat_model.invoke(
-            [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ]
-        )
+        try:
+            result = self._chat_model.invoke(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ]
+            )
+        except Exception as exc:
+            if "rate_limit_exceeded" in str(exc) or "429" in str(exc):
+                raise RateLimitError(str(exc)) from exc
+            raise
         content = getattr(result, "content", result)
         return content if isinstance(content, str) else str(content)
+
+
+class RateLimitError(Exception):
+    pass

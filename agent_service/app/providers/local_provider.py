@@ -9,6 +9,7 @@ from app.prompts import (
     GENERATOR_PROMPT,
     RECEIVE_CHOICES_PROMPT,
     RECEIVE_CONTEXTUAL_PROMPT,
+    RECEIVE_FINAL_PROMPT,
     TURN_INTERPRETER_PROMPT,
 )
 
@@ -108,6 +109,9 @@ class LocalProvider:
                 )
             return self._contextual_choices_response(user_prompt)
 
+        if system_prompt == RECEIVE_FINAL_PROMPT:
+            return self._receive_final_response(user_prompt)
+
         if system_prompt == COACH_PROMPT:
             return self._coach_response(user_prompt)
 
@@ -183,6 +187,39 @@ class LocalProvider:
             f"B. Como uma gaveta emperrada: você puxa, hesita, solta, e tudo fica preso no meio em {scene}.\n"
             "C. Como três rádios ligados ao mesmo tempo: sinais disputam espaço "
             f"e nenhuma música consegue abrir caminho em {scene}.\n"
+        )
+
+    def _receive_final_response(self, user_prompt: str) -> str:
+        user_lines = [
+            line.split(":", 1)[1].strip()
+            for line in user_prompt.splitlines()
+            if line.lower().startswith("user:") and ":" in line
+        ]
+        substantive_lines = [
+            line
+            for line in user_lines
+            if line
+            and line.upper() not in {"A", "B", "C"}
+            and not self._is_refinement_request(line.lower())
+            and line.lower()
+            not in {
+                "não sei",
+                "nao sei",
+                "talvez",
+                "tanto faz",
+                "não tenho certeza",
+                "nao tenho certeza",
+                "sei lá",
+                "sei la",
+            }
+        ]
+        seed = substantive_lines[-1] if substantive_lines else "essa imagem"
+        anchor = substantive_lines[-2] if len(substantive_lines) > 1 else "o conflito antigo"
+
+        return (
+            f"Fica como uma luta antiga no mesmo ringue: {anchor} segue ali, gastando força, "
+            f"enquanto {seed} tenta atravessar o ruído sem desaparecer. E o que antes era só briga cega "
+            "começa a virar um instante de definição, como se a cena finalmente mostrasse qual som ainda fica de pé."
         )
 
     def _extract_symbol(self, text: str) -> str | None:

@@ -30,6 +30,17 @@ Rules:
 - critique cliche, vagueness, moralizing, weak movement
 - do not flatter weak work"""
 
+RECEIVE_FINAL_PROMPT = """You write the final refined metaphor for receive mode.
+Rules:
+- write in Brazilian Portuguese
+- deliver the final metaphor only, not analysis
+- do not ask a question
+- do not use bullets or labels
+- preserve the user's symbolic field and strongest concrete elements
+- include tension and a slight movement or reorganization
+- keep it concise, vivid, and memorable
+- avoid diagnosis, moralizing, or explicit explanation"""
+
 RECEIVE_CHOICES_PROMPT = """You generate three metaphor candidates
 from the user's first problem sentence.
 Rules:
