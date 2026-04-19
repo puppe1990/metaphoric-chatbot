@@ -164,7 +164,7 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
   }
 
   return (
-    <main className="grid h-[100dvh] grid-rows-[auto_1fr] overflow-hidden pt-4">
+    <main className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden pt-4">
       <div className="min-h-0 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           {error ? (
@@ -174,7 +174,7 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
           ) : null}
         </div>
       </div>
-      <div className="min-h-0">
+      <div className="flex min-h-0 flex-1">
         <ChatShell
           inputDisabled={isLoading || isSubmitting || isRestarting}
           inputValue={draft}
