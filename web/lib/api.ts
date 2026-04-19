@@ -9,6 +9,33 @@ export type ChatMessage = {
   content: string;
 };
 
+export type AgentApiErrorDetail = {
+  code?: string;
+  message?: string;
+  provider?: string;
+  model?: string;
+  retryable?: boolean;
+  action?: string;
+};
+
+export class AgentRequestError extends Error {
+  status: number;
+  detail: string | AgentApiErrorDetail | null;
+
+  constructor(status: number, detail: string | AgentApiErrorDetail | null, fallbackMessage: string) {
+    const message =
+      typeof detail === "object" && detail !== null && typeof detail.message === "string"
+        ? detail.message
+        : typeof detail === "string"
+          ? detail
+          : fallbackMessage;
+    super(message);
+    this.name = "AgentRequestError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
 export const RECEIVE_CHOICE_ARTIFACT_TYPE = "receive_choice";
 
 export type MetaphorChoice = {
@@ -178,11 +205,15 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
     if (!response.ok) {
       const detail =
         payload && typeof payload === "object" && "detail" in payload
-          ? String(payload.detail)
+          ? (payload.detail as string | AgentApiErrorDetail | null)
           : typeof payload === "string"
             ? payload
-            : response.statusText;
-      throw new Error(`Agent request failed (${response.status}): ${detail}`);
+            : null;
+      throw new AgentRequestError(
+        response.status,
+        detail,
+        `Agent request failed (${response.status}): ${response.statusText}`,
+      );
     }
 
     return payload as T;

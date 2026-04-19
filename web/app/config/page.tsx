@@ -12,6 +12,9 @@ const PROVIDER_LABELS: Record<string, string> = {
   local: "Local (mock)",
 };
 
+const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+const DEFAULT_NVIDIA_MODEL = "openai/gpt-oss-120b";
+
 type Option = { value: string; label: string };
 
 const selectStyles: StylesConfig<Option> = {
@@ -38,7 +41,7 @@ const selectStyles: StylesConfig<Option> = {
 export default function ConfigPage() {
   const [config, setConfig] = useState<ProviderConfig | null>(null);
   const [provider, setProvider] = useState("groq");
-  const [model, setModel] = useState("llama-3.3-70b-versatile");
+  const [model, setModel] = useState(DEFAULT_GROQ_MODEL);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
 
@@ -58,8 +61,8 @@ export default function ConfigPage() {
 
   function handleProviderChange(p: string) {
     setProvider(p);
-    if (p === "groq") setModel((config?.groq_models ?? [])[0] ?? "llama-3.3-70b-versatile");
-    if (p === "nvidia") setModel((config?.nvidia_models ?? [])[0] ?? "meta/llama-3.3-70b-instruct");
+    if (p === "groq") setModel((config?.groq_models ?? [])[0] ?? DEFAULT_GROQ_MODEL);
+    if (p === "nvidia") setModel((config?.nvidia_models ?? [])[0] ?? DEFAULT_NVIDIA_MODEL);
   }
 
   async function handleSave() {
@@ -78,9 +81,9 @@ export default function ConfigPage() {
 
   const modelList =
     provider === "groq"
-      ? (config?.groq_models ?? ["llama-3.3-70b-versatile"])
+      ? (config?.groq_models ?? [DEFAULT_GROQ_MODEL])
       : provider === "nvidia"
-        ? (config?.nvidia_models ?? ["meta/llama-3.3-70b-instruct"])
+        ? (config?.nvidia_models ?? [DEFAULT_NVIDIA_MODEL])
         : [];
 
   const modelOptions: Option[] = modelList.map((m) => ({ value: m, label: m }));

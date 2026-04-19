@@ -360,6 +360,49 @@ def test_message_endpoint_normalizes_malformed_receive_choices_into_safe_artifac
     assert "Que mudança você gostaria de sentir ao final desta metáfora?" not in assistant_messages
 
 
+def test_message_endpoint_returns_structured_provider_error_when_model_is_unavailable(tmp_path, monkeypatch):
+    class ExpiredModelProvider:
+        def invoke_chat(self, system_prompt: str, user_prompt: str) -> str:
+            raise Exception(
+                "[410] Gone\n"
+                "The model 'deepseek-ai/deepseek-r1' has reached its end of life on "
+                "2026-01-26T00:00:00Z and is no longer available."
+            )
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: ExpiredModelProvider())
+    monkeypatch.setattr(
+        "app.main._load_provider_config",
+        lambda _db: __import__("app.main", fromlist=["ProviderConfig"]).ProviderConfig(
+            provider="nvidia",
+            model="deepseek-ai/deepseek-r1",
+        ),
+    )
+
+    with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
+        started = client.post("/api/chat/start", json={"mode": "receive"})
+        token = started.json()["token"]
+
+        response = client.post(
+            "/api/chat/message",
+            json={"token": token, "content": "Meu projeto trava quando preciso decidir."},
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": {
+            "code": "provider_model_unavailable",
+            "message": (
+                "O modelo NVIDIA NIM / deepseek-ai/deepseek-r1 não está mais disponível. "
+                "Troque de modelo ou provider para continuar."
+            ),
+            "provider": "nvidia",
+            "model": "deepseek-ai/deepseek-r1",
+            "retryable": False,
+            "action": "switch_provider_or_model",
+        }
+    }
+
+
 def test_start_session_rejects_invalid_mode_with_400(tmp_path):
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         response = client.post("/api/chat/start", json={"mode": "unknown"})

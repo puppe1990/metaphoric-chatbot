@@ -9,6 +9,9 @@ import { downloadChatMarkdown } from "../lib/chat-markdown";
 import type { GuidedSessionView } from "../lib/api";
 
 type ChatShellProps = {
+  activeModel?: string;
+  activeProviderLabel?: string;
+  isThinking?: boolean;
   session: GuidedSessionView;
   inputDisabled?: boolean;
   inputValue?: string;
@@ -20,6 +23,9 @@ type ChatShellProps = {
 };
 
 export function ChatShell({
+  activeModel,
+  activeProviderLabel,
+  isThinking = false,
   inputDisabled = false,
   inputValue,
   onInputChange,
@@ -29,6 +35,8 @@ export function ChatShell({
   restartDisabled = false,
   session,
 }: ChatShellProps) {
+  const topActionButtonClassName =
+    "min-h-11 rounded-xl border border-ink/10 bg-white/90 px-4 py-2.5 text-sm font-semibold text-ink shadow-[0_1px_0_rgba(23,25,18,0.02)] transition-colors hover:border-ink/20 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60";
   const [draft, setDraft] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -91,16 +99,28 @@ export function ChatShell({
     }
 
     transcript.scrollTop = transcript.scrollHeight;
-  }, [session.messages, session.artifacts]);
+  }, [isThinking, session.artifacts.length, session.messages.length]);
 
   return (
     <section className="flex min-h-0 flex-1 px-3 pt-3 text-ink sm:px-5 sm:pt-4">
       <div className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-ink/10 bg-white/82 shadow-[0_24px_80px_rgba(23,25,18,0.12)] backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink/10 bg-white/78 px-4 py-4 sm:px-6">
-          <ProgressChip label={session.progressLabel} />
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+            <ProgressChip label={session.progressLabel} />
+            {activeProviderLabel && activeModel ? (
+              <div className="min-w-0 rounded-lg border border-ink/10 bg-fog/80 px-3 py-1.5">
+                <p className="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-clay">Modelo ativo</p>
+                <p className="truncate text-sm font-semibold text-ink">
+                  {activeProviderLabel}
+                  <span className="px-1.5 text-clay">/</span>
+                  <span className="font-medium text-clay">{activeModel}</span>
+                </p>
+              </div>
+            ) : null}
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
-              className="rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-fog disabled:cursor-not-allowed disabled:opacity-60"
+              className={topActionButtonClassName}
               disabled={inputDisabled}
               onClick={() => downloadChatMarkdown(session)}
               type="button"
@@ -109,7 +129,7 @@ export function ChatShell({
             </button>
             {onRestart ? (
               <button
-                className="rounded-lg border border-ink/10 bg-fog px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                className={topActionButtonClassName}
                 disabled={restartDisabled}
                 onClick={onRestart}
                 type="button"
@@ -126,6 +146,7 @@ export function ChatShell({
               <MessageList
                 artifacts={session.artifacts}
                 disabled={inputDisabled}
+                isThinking={isThinking}
                 messages={session.messages}
                 onChoiceSelect={handleChoiceSelect}
               />

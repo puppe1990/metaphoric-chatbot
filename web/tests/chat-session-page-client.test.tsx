@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatSessionPageClient } from "../app/c/[token]/chat-session-page-client";
 import { clearRecentSessions } from "../lib/session";
@@ -192,5 +192,103 @@ describe("ChatSessionPageClient", () => {
 
     expect(document.documentElement.style.overflow).toBe("");
     expect(document.body.style.overflow).toBe("");
+  });
+
+  it("shows the active provider and model in the chat header", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.endsWith("/api/config")) {
+          return new Response(
+            JSON.stringify({
+              provider: "groq",
+              model: "llama-3.3-70b-versatile",
+              groq_models: ["llama-3.3-70b-versatile"],
+              nvidia_models: ["openai/gpt-oss-120b"],
+            }),
+            { status: 200 },
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            token: "receive_token",
+            mode: "receive",
+            state: "intake_problem",
+            messages: [{ role: "assistant", content: "Descreva o problema em uma frase simples." }],
+            artifacts: [],
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+
+    render(<ChatSessionPageClient requestedMode="receive" token="receive_token" />);
+
+    expect(await screen.findByText("Modelo ativo")).toBeInTheDocument();
+    expect(screen.getByText("Groq")).toBeInTheDocument();
+    expect(screen.getByText("llama-3.3-70b-versatile")).toBeInTheDocument();
+  });
+
+  it("opens the provider switch modal when the API reports the current model is unavailable", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url.endsWith("/api/config") && (!init?.method || init.method === "GET")) {
+        return new Response(
+          JSON.stringify({
+            provider: "nvidia",
+            model: "deepseek-ai/deepseek-r1",
+            groq_models: ["llama-3.3-70b-versatile"],
+            nvidia_models: ["openai/gpt-oss-120b"],
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (url.endsWith("/api/chat/message")) {
+        return new Response(
+          JSON.stringify({
+            detail: {
+              code: "provider_model_unavailable",
+              message:
+                "O modelo NVIDIA NIM / deepseek-ai/deepseek-r1 não está mais disponível. Troque de modelo ou provider para continuar.",
+              provider: "nvidia",
+              model: "deepseek-ai/deepseek-r1",
+              retryable: false,
+              action: "switch_provider_or_model",
+            },
+          }),
+          { status: 503 },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          token: "receive_token",
+          mode: "receive",
+          state: "intake_problem",
+          messages: [{ role: "assistant", content: "Descreva o problema em uma frase simples." }],
+          artifacts: [],
+        }),
+        { status: 200 },
+      );
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ChatSessionPageClient requestedMode="receive" token="receive_token" />);
+
+    const input = await screen.findByLabelText("Message input");
+    fireEvent.change(input, { target: { value: "Meu projeto trava quando preciso decidir." } });
+    fireEvent.submit(screen.getByRole("button", { name: "Enviar" }).closest("form") as HTMLFormElement);
+
+    const dialog = await screen.findByRole("dialog", { name: "Trocar provider ou modelo" });
+
+    expect(within(dialog).getByText(/deepseek-ai\/deepseek-r1 não está mais disponível/i)).toBeInTheDocument();
+    expect(within(dialog).getAllByRole("combobox")).toHaveLength(2);
+    expect(within(dialog).getByRole("button", { name: "Salvar e tentar de novo" })).toBeInTheDocument();
   });
 });
