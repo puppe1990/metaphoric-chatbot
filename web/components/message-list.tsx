@@ -1,5 +1,10 @@
 import React from "react";
-import { isReceiveChoiceArtifact, type ChatArtifact, type ChatMessage } from "../lib/api";
+import {
+  isReceiveChoiceArtifact,
+  isReceiveFinalComparisonArtifact,
+  type ChatArtifact,
+  type ChatMessage,
+} from "../lib/api";
 import { MetaphorChoiceList } from "./metaphor-choice-list";
 
 function getMessageTone(role: ChatMessage["role"]) {
@@ -63,9 +68,12 @@ export function MessageList({
   const receiveChoiceArtifact = [...artifacts].reverse().find(
     (artifact) => isReceiveChoiceArtifact(artifact) && artifact.metadata?.selected_option == null,
   );
+  const finalComparisonArtifact = [...artifacts].reverse().find(isReceiveFinalComparisonArtifact);
   const receiveChoiceMessageIndex = receiveChoiceArtifact ? findLatestAssistantMessageIndex(messages) : -1;
+  const latestAssistantMessageIndex = findLatestAssistantMessageIndex(messages);
   const inlineSuggestionMessageIndex =
-    inlineSuggestions.length > 0 && receiveChoiceArtifact == null ? findLatestAssistantMessageIndex(messages) : -1;
+    inlineSuggestions.length > 0 && receiveChoiceArtifact == null ? latestAssistantMessageIndex : -1;
+  const finalComparisonMessageIndex = finalComparisonArtifact ? latestAssistantMessageIndex : -1;
 
   return (
     <ol aria-label="Chat messages" className="space-y-3">
@@ -99,6 +107,35 @@ export function MessageList({
                 >
                   {suggestion}
                 </button>
+              ))}
+            </div>
+          ) : null}
+          {index === finalComparisonMessageIndex && finalComparisonArtifact ? (
+            <div className="mt-4 grid gap-3 md:grid-cols-2" aria-label="Comparação de metáforas finais">
+              {finalComparisonArtifact.comparison_variants.map((variant) => (
+                <section
+                  key={variant.style}
+                  className={[
+                    "rounded-lg border border-ink/10 px-4 py-3 text-ink",
+                    variant.status === "pending" ? "bg-white" : "bg-fog/70",
+                  ].join(" ")}
+                >
+                  <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] opacity-70">
+                    {variant.title}
+                  </p>
+                  <p
+                    className={[
+                      "whitespace-pre-wrap text-sm leading-6 sm:text-[0.98rem]",
+                      variant.status === "pending" ? "animate-pulse text-clay" : "",
+                    ].join(" ")}
+                  >
+                    {variant.status === "pending"
+                      ? "Pensando..."
+                      : variant.status === "error"
+                        ? "Não consegui gerar esta variação agora."
+                        : variant.text}
+                  </p>
+                </section>
               ))}
             </div>
           ) : null}

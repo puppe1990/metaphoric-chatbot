@@ -11,11 +11,12 @@ from .prompts import (
     GENERATOR_PROMPT,
     RECEIVE_CHOICES_PROMPT,
     RECEIVE_CONTEXTUAL_PROMPT,
-    RECEIVE_FINAL_PROMPT,
+    RECEIVE_FINAL_BANDLER_PROMPT,
+    RECEIVE_FINAL_ERICKSON_PROMPT,
     TURN_INTERPRETER_PROMPT,
 )
 from .providers.base import ChatProvider
-from .schemas import ArtifactMetadata, ArtifactView, ChoiceLabel, MetaphorChoice, TurnIntent
+from .schemas import ArtifactMetadata, ArtifactView, ChoiceLabel, FinalMetaphorVariant, MetaphorChoice, TurnIntent
 
 CHOICE_LABELS: tuple[ChoiceLabel, ...] = ("A", "B", "C", "D", "E")
 CHOICE_PATTERN = re.compile(r"(?ims)^\s*([A-E])\s*[\.\):-]\s*(.+?)(?=^\s*[A-E]\s*[\.\):-]\s*|\Z)")
@@ -41,8 +42,48 @@ def coach_metaphor(provider: ChatProvider, user_input: str) -> str:
     return provider.invoke_chat(COACH_PROMPT, user_input)
 
 
-def finalize_receive_metaphor(provider: ChatProvider, user_input: str) -> str:
-    return provider.invoke_chat(RECEIVE_FINAL_PROMPT, user_input)
+def finalize_receive_metaphor_comparison(provider: ChatProvider, user_input: str) -> ArtifactView:
+    erickson_text = provider.invoke_chat(RECEIVE_FINAL_ERICKSON_PROMPT, user_input)
+    bandler_text = provider.invoke_chat(RECEIVE_FINAL_BANDLER_PROMPT, user_input)
+    variants = [
+        FinalMetaphorVariant(
+            style="erickson",
+            title="Erickson / insinuante",
+            text=erickson_text,
+        ),
+        FinalMetaphorVariant(
+            style="bandler",
+            title="Bandler / cinematográfica",
+            text=bandler_text,
+        ),
+    ]
+    return ArtifactView(
+        artifact_type="receive_final_comparison",
+        content=_format_final_comparison_content(variants),
+        comparison_variants=variants,
+    )
+
+
+def build_pending_receive_final_comparison() -> ArtifactView:
+    variants = [
+        FinalMetaphorVariant(
+            style="erickson",
+            title="Erickson / insinuante",
+            status="pending",
+            text="",
+        ),
+        FinalMetaphorVariant(
+            style="bandler",
+            title="Bandler / cinematográfica",
+            status="pending",
+            text="",
+        ),
+    ]
+    return ArtifactView(
+        artifact_type="receive_final_comparison",
+        content=_format_final_comparison_content(variants),
+        comparison_variants=variants,
+    )
 
 
 def generate_symbolic_world_choices() -> ArtifactView:
@@ -163,6 +204,15 @@ def hydrate_receive_choice_artifact(
     )
 
 
+def hydrate_receive_final_comparison_artifact(content: str) -> ArtifactView:
+    variants = _parse_final_comparison_content(content)
+    return ArtifactView(
+        artifact_type="receive_final_comparison",
+        content=content,
+        comparison_variants=variants,
+    )
+
+
 def _parse_receive_choices(raw_output: str) -> list[MetaphorChoice] | None:
     matches = list(CHOICE_PATTERN.finditer(raw_output.strip()))
     if not matches:
@@ -187,6 +237,27 @@ def _normalize_choice_text(text: str) -> str:
     compact = re.sub(r"\s+", " ", compact)
     compact = re.sub(r"\s*Escolha\s+[A-E](?:,\s*[A-E])*(?:\s+ou\s+[A-E])?\.?\s*$", "", compact, flags=re.IGNORECASE)
     return compact.strip(" -")
+
+
+def _format_final_comparison_content(variants: list[FinalMetaphorVariant]) -> str:
+    return json.dumps([variant.model_dump() for variant in variants], ensure_ascii=False)
+
+
+def _parse_final_comparison_content(content: str) -> list[FinalMetaphorVariant]:
+    try:
+        payload = json.loads(content)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(payload, list):
+        return []
+    variants: list[FinalMetaphorVariant] = []
+    for item in payload:
+        if isinstance(item, dict):
+            try:
+                variants.append(FinalMetaphorVariant.model_validate(item))
+            except Exception:
+                continue
+    return variants
 
 
 def _fallback_receive_choices(user_input: str) -> list[MetaphorChoice]:

@@ -37,6 +37,7 @@ export class AgentRequestError extends Error {
 }
 
 export const RECEIVE_CHOICE_ARTIFACT_TYPE = "receive_choice";
+export const RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE = "receive_final_comparison";
 
 export type MetaphorChoice = {
   label: "A" | "B" | "C" | "D" | "E";
@@ -49,11 +50,19 @@ export type ArtifactMetadata = {
   selected_option: "A" | "B" | "C" | "D" | "E" | null;
 };
 
+export type FinalMetaphorVariant = {
+  style: string;
+  title: string;
+  status: string;
+  text: string;
+};
+
 type BaseChatArtifact = {
   artifact_type: string;
   content: string;
   metadata: ArtifactMetadata | null;
   choices: MetaphorChoice[];
+  comparison_variants?: FinalMetaphorVariant[];
 };
 
 export type ReceiveChoiceArtifact = {
@@ -63,10 +72,38 @@ export type ReceiveChoiceArtifact = {
   choices: MetaphorChoice[];
 };
 
-export type ChatArtifact = ReceiveChoiceArtifact | BaseChatArtifact;
+export type ReceiveFinalComparisonArtifact = {
+  artifact_type: typeof RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE;
+  content: string;
+  metadata: null;
+  choices: [];
+  comparison_variants: FinalMetaphorVariant[];
+};
+
+export type ChatArtifact = ReceiveChoiceArtifact | ReceiveFinalComparisonArtifact | BaseChatArtifact;
 
 export function isReceiveChoiceArtifact(artifact: ChatArtifact): artifact is ReceiveChoiceArtifact {
   return artifact.artifact_type === RECEIVE_CHOICE_ARTIFACT_TYPE && artifact.choices.length > 0;
+}
+
+export function isReceiveFinalComparisonArtifact(
+  artifact: ChatArtifact,
+): artifact is ReceiveFinalComparisonArtifact {
+  return (
+    artifact.artifact_type === RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE &&
+    "comparison_variants" in artifact &&
+    Array.isArray(artifact.comparison_variants) &&
+    artifact.comparison_variants.length > 0
+  );
+}
+
+export function hasPendingFinalComparison(session: Pick<GuidedSessionView, "artifacts">) {
+  const comparisonArtifact = [...session.artifacts].reverse().find(isReceiveFinalComparisonArtifact);
+  if (!comparisonArtifact) {
+    return false;
+  }
+
+  return comparisonArtifact.comparison_variants.some((variant) => variant.status === "pending");
 }
 
 export type SessionStartResponse = {

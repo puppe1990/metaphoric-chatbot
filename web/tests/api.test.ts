@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getGuidedSessionView,
   RECEIVE_CHOICE_ARTIFACT_TYPE,
+  RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE,
   getSession,
   sendMessage,
   startSession,
@@ -102,6 +103,39 @@ describe("api helpers", () => {
             { label: "A", text: "Uma ponte oscilando." },
             { label: "B", text: "Um motor sem tração." },
             { label: "C", text: "Uma porta pesada." },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("carries final comparison artifacts through the guided session view", () => {
+    expect(
+      getGuidedSessionView({
+        token: "tok_compare",
+        mode: "receive",
+        state: "refine_selected",
+        messages: [{ role: "assistant", content: "Aqui estão duas leituras finais do mesmo núcleo metafórico." }],
+        artifacts: [
+          {
+            artifact_type: RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE,
+            content: "[]",
+            metadata: null,
+            choices: [],
+            comparison_variants: [
+              { style: "erickson", title: "Erickson / insinuante", text: "Primeira versão" },
+              { style: "bandler", title: "Bandler / cinematográfica", text: "Segunda versão" },
+            ],
+          },
+        ],
+      }),
+    ).toMatchObject({
+      artifacts: [
+        {
+          artifact_type: RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE,
+          comparison_variants: [
+            { title: "Erickson / insinuante", text: "Primeira versão" },
+            { title: "Bandler / cinematográfica", text: "Segunda versão" },
           ],
         },
       ],

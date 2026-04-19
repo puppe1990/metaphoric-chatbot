@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from app.db import SessionLocal
 from app.main import build_contextual_user_input, create_app
@@ -303,6 +305,13 @@ def test_message_endpoint_receive_mode_converges_to_final_metaphor(tmp_path, mon
     from app.providers.local_provider import LocalProvider
 
     monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+    monkeypatch.setattr(
+        "app.main._load_provider_config",
+        lambda _db: __import__("app.main", fromlist=["ProviderConfig"]).ProviderConfig(
+            provider="local",
+            model="",
+        ),
+    )
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
@@ -323,6 +332,18 @@ def test_message_endpoint_receive_mode_converges_to_final_metaphor(tmp_path, mon
             json={"token": token, "content": "eu preciso que no fim sobre uma abertura limpa para agir"},
         )
 
+        final_body = None
+        for _ in range(200):
+            restored = client.get(f"/api/chat/session/{token}")
+            assert restored.status_code == 200
+            candidate = restored.json()
+            final_artifact = candidate["artifacts"][-1]
+            statuses = [variant["status"] for variant in final_artifact["comparison_variants"]]
+            if statuses == ["complete", "complete"]:
+                final_body = candidate
+                break
+            time.sleep(0.05)
+
     assert first_follow_up.status_code == 200
     assert "?" in first_follow_up.json()["assistant_message"]
     assert second_follow_up.status_code == 200
@@ -330,10 +351,23 @@ def test_message_endpoint_receive_mode_converges_to_final_metaphor(tmp_path, mon
     assert response.status_code == 200
     body = response.json()
     assert body["state"] == "refine_selected"
-    assert "?" not in body["assistant_message"]
-    assert "ringue" in body["assistant_message"].lower()
-    assert "chiado" in body["assistant_message"].lower()
-    assert body["assistant_message"].count("\n\n") == 2
+    assert body["assistant_message"] == "Aqui estão duas leituras finais do mesmo núcleo metafórico."
+    comparison_artifact = body["artifacts"][-1]
+    assert comparison_artifact["artifact_type"] == "receive_final_comparison"
+    assert len(comparison_artifact["comparison_variants"]) == 2
+    assert comparison_artifact["comparison_variants"][0]["title"] == "Erickson / insinuante"
+    assert comparison_artifact["comparison_variants"][1]["title"] == "Bandler / cinematográfica"
+    assert comparison_artifact["comparison_variants"][0]["status"] == "pending"
+    assert comparison_artifact["comparison_variants"][1]["status"] == "pending"
+
+    assert final_body is not None
+    final_artifact = final_body["artifacts"][-1]
+    assert "chiado" in final_artifact["comparison_variants"][0]["text"].lower()
+    assert "chiado" in final_artifact["comparison_variants"][1]["text"].lower()
+    assert "máquina imensa" not in final_artifact["comparison_variants"][0]["text"].lower()
+    assert "máquina imensa" not in final_artifact["comparison_variants"][1]["text"].lower()
+    assert final_artifact["comparison_variants"][0]["text"].count("\n\n") == 2
+    assert final_artifact["comparison_variants"][1]["text"].count("\n\n") == 2
 
 
 def test_message_endpoint_refinement_request_uses_symbolic_world_name_instead_of_letter(tmp_path, monkeypatch):
@@ -619,10 +653,16 @@ def test_build_assistant_message_finalizes_receive_when_image_has_enough_materia
     )
 
     assert state == "refine_selected"
-    assert "?" not in message
-    assert "luta" in message.lower()
-    assert message.count("\n\n") == 2
-    assert artifacts == []
+    assert message == "Aqui estão duas leituras finais do mesmo núcleo metafórico."
+    assert len(artifacts) == 1
+    assert artifacts[0].artifact_type == "receive_final_comparison"
+    assert len(artifacts[0].comparison_variants) == 2
+    assert artifacts[0].comparison_variants[0].title == "Erickson / insinuante"
+    assert artifacts[0].comparison_variants[1].title == "Bandler / cinematográfica"
+    assert artifacts[0].comparison_variants[0].status == "pending"
+    assert artifacts[0].comparison_variants[1].status == "pending"
+    assert artifacts[0].comparison_variants[0].text == ""
+    assert artifacts[0].comparison_variants[1].text == ""
     assert interpretation is not None
 
 
@@ -650,6 +690,205 @@ def test_build_assistant_message_keeps_exploring_before_three_llm_questions():
     assert "?" in message
     assert artifacts == []
     assert interpretation is not None
+
+
+def test_build_assistant_message_uses_more_imagetic_machine_question_for_stuck_gear():
+    state, message, artifacts, interpretation = build_assistant_message(
+        mode="receive",
+        state="refine_selected",
+        user_input=(
+            "assistant: Descreva o problema em uma frase simples.\n"
+            "user: Estou travado para tomar uma decisão.\n"
+            "assistant: Em qual desses mundos isso se encaixa?\n"
+            "user: D\n"
+            "assistant: Boa. Agora diga como voce quer ajustar essa opcao.\n"
+            "user: mais concreta\n"
+            "assistant: Boa. Para seguir por maquina / engenharia...\n"
+            "user: a engrenagem ta emperrada"
+        ),
+        provider_factory=lambda: __import__("app.providers.local_provider", fromlist=["LocalProvider"]).LocalProvider(),
+    )
+
+    assert state == "refine_selected"
+    assert "o que essa engrenagem precisa destravar" in message.lower()
+    assert "movimento você está tentando fazer" not in message.lower()
+    assert artifacts == []
+    assert interpretation is not None
+
+
+def test_build_assistant_message_uses_more_imagetic_machine_question_for_lever():
+    state, message, artifacts, interpretation = build_assistant_message(
+        mode="receive",
+        state="refine_selected",
+        user_input=(
+            "assistant: Descreva o problema em uma frase simples.\n"
+            "user: Estou travado para tomar uma decisão.\n"
+            "assistant: Em qual desses mundos isso se encaixa?\n"
+            "user: D\n"
+            "assistant: Boa. Agora diga como voce quer ajustar essa opcao.\n"
+            "user: mais concreta\n"
+            "assistant: Boa. Para seguir por maquina / engenharia...\n"
+            "user: uma alavanca com pessoas fortes"
+        ),
+        provider_factory=lambda: __import__("app.providers.local_provider", fromlist=["LocalProvider"]).LocalProvider(),
+    )
+
+    assert state == "refine_selected"
+    assert "o que faz essa alavanca ter força de verdade" in message.lower()
+    assert "aspecto concreto da alavanca" not in message.lower()
+    assert artifacts == []
+    assert interpretation is not None
+
+
+def test_build_assistant_message_asks_for_tactic_not_spectacle_in_war_field():
+    state, message, artifacts, interpretation = build_assistant_message(
+        mode="receive",
+        state="refine_selected",
+        user_input=(
+            "assistant: Descreva o problema em uma frase simples.\n"
+            "user: Sei o que quero, mas fico adiando.\n"
+            "assistant: Em qual desses mundos isso se encaixa?\n"
+            "user: B\n"
+            "assistant: Boa. Agora diga como voce quer ajustar essa opcao.\n"
+            "user: mais concreta\n"
+            "assistant: Boa. Para seguir por guerra / estrategia...\n"
+            "user: uma muralha gigante\n"
+            "assistant: Entao, ao olhar essa muralha gigante...\n"
+            "user: uma muralha forte e densa\n"
+            "assistant: Entao, ao encarar essa muralha forte e densa...\n"
+            "user: nao consigo passar por ela\n"
+        ),
+        provider_factory=lambda: __import__("app.providers.local_provider", fromlist=["LocalProvider"]).LocalProvider(),
+    )
+
+    assert state == "refine_selected"
+    lowered = message.lower()
+    assert "ritmo" in lowered or "mirar" in lowered or "janela" in lowered or "alcance" in lowered
+    assert "romper ou contornar essa barreira" not in lowered
+    assert artifacts == []
+    assert interpretation is not None
+
+
+def test_local_provider_receive_final_response_preserves_user_war_scene_instead_of_generic_machine():
+    from app.prompts import RECEIVE_FINAL_BANDLER_PROMPT, RECEIVE_FINAL_ERICKSON_PROMPT
+    from app.providers.local_provider import LocalProvider
+
+    provider = LocalProvider()
+    transcript = (
+        "assistant: Descreva o problema em uma frase simples.\n"
+        "user: Sei o que quero, mas fico adiando.\n"
+        "assistant: Em qual desses mundos isso se encaixa?\n"
+        "user: B\n"
+        "assistant: Boa. Agora diga como voce quer ajustar essa opcao.\n"
+        "user: mais concreta\n"
+        "assistant: Boa. Para seguir por guerra / estrategia...\n"
+        "user: uma muralha gigante\n"
+        "assistant: Entao, ao olhar essa muralha gigante...\n"
+        "user: uma muralha forte e densa\n"
+        "assistant: Entao, a muralha parece intransponivel...\n"
+        "user: uma catapulta\n"
+    )
+
+    erickson = provider.invoke_chat(RECEIVE_FINAL_ERICKSON_PROMPT, transcript).lower()
+    bandler = provider.invoke_chat(RECEIVE_FINAL_BANDLER_PROMPT, transcript).lower()
+
+    assert "muralha" in erickson
+    assert "catapulta" in erickson
+    assert "máquina imensa" not in erickson
+    assert "muralha" in bandler
+    assert "catapulta" in bandler
+    assert "máquina" not in bandler
+
+
+def test_message_endpoint_receive_mode_final_keeps_user_mechanism_and_avoids_epic_cliches(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+    monkeypatch.setattr(
+        "app.main._load_provider_config",
+        lambda _db: __import__("app.main", fromlist=["ProviderConfig"]).ProviderConfig(
+            provider="local",
+            model="",
+        ),
+    )
+
+    with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
+        token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
+        client.post("/api/chat/message", json={"token": token, "content": "Sei o que quero, mas fico adiando."})
+        client.post("/api/chat/message", json={"token": token, "content": "B"})
+        client.post("/api/chat/message", json={"token": token, "content": "mais concreta"})
+        client.post("/api/chat/message", json={"token": token, "content": "uma muralha gigante"})
+        client.post("/api/chat/message", json={"token": token, "content": "uma muralha forte e densa"})
+        client.post("/api/chat/message", json={"token": token, "content": "nao consigo passar por ela"})
+        response = client.post("/api/chat/message", json={"token": token, "content": "uma catapulta"})
+
+        final_body = None
+        for _ in range(200):
+            restored = client.get(f"/api/chat/session/{token}")
+            assert restored.status_code == 200
+            candidate = restored.json()
+            final_artifact = candidate["artifacts"][-1]
+            statuses = [variant["status"] for variant in final_artifact["comparison_variants"]]
+            if statuses == ["complete", "complete"]:
+                final_body = candidate
+                break
+            time.sleep(0.05)
+
+    assert response.status_code == 200
+    assert final_body is not None
+    joined = " ".join(variant["text"].lower() for variant in final_body["artifacts"][-1]["comparison_variants"])
+    assert "muralha" in joined
+    assert "catapulta" in joined
+    assert "céu de chumbo" not in joined
+    assert "raio distante" not in joined
+    assert "máquina imensa" not in joined
+
+
+def test_coach_prompt_pushes_war_field_toward_tactic_instead_of_symbol_explanation():
+    from app.prompts import COACH_PROMPT
+
+    lowered = COACH_PROMPT.lower()
+    assert "war / strategy" in lowered
+    assert "tactic" in lowered
+    assert "timing" in lowered
+    assert "ask what it guards" not in lowered
+    assert "ask what it blocks" not in lowered
+
+
+def test_receive_final_prompts_forbid_ornamental_cliche_language_seen_in_browser():
+    from app.prompts import RECEIVE_FINAL_BANDLER_PROMPT, RECEIVE_FINAL_ERICKSON_PROMPT
+
+    erickson_lowered = RECEIVE_FINAL_ERICKSON_PROMPT.lower()
+    bandler_lowered = RECEIVE_FINAL_BANDLER_PROMPT.lower()
+
+    for lowered in (erickson_lowered, bandler_lowered):
+        assert "ornamental adjectives" in lowered
+        assert "stone-black walls" not in lowered
+        assert "heart-like openings" not in lowered
+
+    for lowered in (erickson_lowered, bandler_lowered):
+        for fragment in ("heart", "light", "shadow", "black stone", "heroic corridor"):
+            assert fragment in lowered
+
+
+def test_receive_final_prompts_push_finer_style_split_for_real_provider():
+    from app.prompts import RECEIVE_FINAL_BANDLER_PROMPT, RECEIVE_FINAL_ERICKSON_PROMPT
+
+    erickson_lowered = RECEIVE_FINAL_ERICKSON_PROMPT.lower()
+    bandler_lowered = RECEIVE_FINAL_BANDLER_PROMPT.lower()
+
+    assert "use understatement, implication, and small sensory shifts" in erickson_lowered
+    assert "avoid muscular pep-talk cadence" in erickson_lowered
+    assert "privilege calibration, repetition, leverage, contact, recoil, and structural response" in bandler_lowered
+    assert "avoid lyrical narration" in bandler_lowered
+
+
+def test_receive_final_erickson_prompt_forbids_grandiose_shortcuts():
+    from app.prompts import RECEIVE_FINAL_ERICKSON_PROMPT
+
+    lowered = RECEIVE_FINAL_ERICKSON_PROMPT.lower()
+    assert "avoid horizon, destiny, revelation, unexpected path, or majestic scale" in lowered
+    assert "prefer nearby detail over panoramic grandeur" in lowered
 
 
 def test_interpret_turn_marks_user_metaphor_when_user_supplies_new_image():

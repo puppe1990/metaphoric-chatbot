@@ -2,7 +2,11 @@ import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ChatShell } from "../components/chat-shell";
-import { RECEIVE_CHOICE_ARTIFACT_TYPE, type GuidedSessionView } from "../lib/api";
+import {
+  RECEIVE_CHOICE_ARTIFACT_TYPE,
+  RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE,
+  type GuidedSessionView,
+} from "../lib/api";
 
 describe("ChatShell", () => {
   it("renders the guided view model and supports draft input", () => {
@@ -262,6 +266,54 @@ describe("ChatShell", () => {
     expect(
       within(latestAssistantMessage).getByRole("button", { name: "E Uma caldeira perto do limite." }),
     ).toBeInTheDocument();
+  });
+
+  it("renders final metaphor comparisons side by side under the latest assistant message", () => {
+    const session: GuidedSessionView = {
+      token: "tok_compare",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "refine_selected",
+      messages: [
+        { role: "assistant", content: "Descreva o problema em uma frase simples." },
+        { role: "user", content: "Estou travado para tomar uma decisão." },
+        { role: "assistant", content: "Aqui estão duas leituras finais do mesmo núcleo metafórico." },
+      ],
+      artifacts: [
+        {
+          artifact_type: RECEIVE_FINAL_COMPARISON_ARTIFACT_TYPE,
+          content: "[]",
+          metadata: null,
+          choices: [],
+          comparison_variants: [
+            {
+              style: "erickson",
+              title: "Erickson / insinuante",
+              text: "Primeiro parágrafo.\n\nSegundo parágrafo.\n\nTerceiro parágrafo.",
+            },
+            {
+              style: "bandler",
+              title: "Bandler / cinematográfica",
+              text: "Cena um.\n\nCena dois.\n\nCena três.",
+            },
+          ],
+        },
+      ],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: [],
+    };
+
+    render(<ChatShell session={session} />);
+
+    const transcriptItems = screen.getAllByRole("listitem");
+    const latestAssistantMessage = transcriptItems[2];
+
+    expect(within(latestAssistantMessage).getByText("Erickson / insinuante")).toBeInTheDocument();
+    expect(within(latestAssistantMessage).getByText("Bandler / cinematográfica")).toBeInTheDocument();
+    expect(within(latestAssistantMessage).getByText(/Primeiro parágrafo/)).toBeInTheDocument();
+    expect(within(latestAssistantMessage).getByText(/Cena um/)).toBeInTheDocument();
   });
 
   it("hides stale receive-choice artifacts after a selection was made during refinement", () => {

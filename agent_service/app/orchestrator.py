@@ -4,9 +4,9 @@ from collections.abc import Callable
 
 from app.agents import (
     TurnInterpretation,
+    build_pending_receive_final_comparison,
     build_receive_concrete_anchor_prompt,
     coach_metaphor,
-    finalize_receive_metaphor,
     generate_symbolic_world_choices,
     has_receive_concrete_anchor,
     interpret_turn,
@@ -25,6 +25,7 @@ RECEIVE_SYMBOLIC_GUIDE_MESSAGE = "Escolha o mundo que mais encaixa. Depois eu de
 REFINE_SELECTED_MESSAGE = (
     "Boa. Agora diga como você quer ajustar essa opção: mais curta, mais concreta, mais poética ou mais direta."
 )
+RECEIVE_FINAL_COMPARISON_MESSAGE = "Aqui estão duas leituras finais do mesmo núcleo metafórico."
 
 
 def start_assistant_message(mode: str) -> str:
@@ -59,10 +60,11 @@ def build_assistant_message(
             if interpretation.intent == "refinement_request" and not has_receive_concrete_anchor(user_input):
                 interpretation.assistant_response_kind = "receive_concrete_anchor_prompt"
                 return "refine_selected", build_receive_concrete_anchor_prompt(user_input), [], interpretation
-            provider = provider_factory()
             if should_finalize_receive_response(state, user_input, interpretation, receive_llm_question_count):
-                interpretation.assistant_response_kind = "receive_llm_final"
-                return "refine_selected", finalize_receive_metaphor(provider, user_input), [], interpretation
+                interpretation.assistant_response_kind = "receive_llm_final_pending"
+                artifact = build_pending_receive_final_comparison()
+                return "refine_selected", RECEIVE_FINAL_COMPARISON_MESSAGE, [artifact], interpretation
+            provider = provider_factory()
             if interpretation.intent in {"user_introduced_metaphor", "refinement_request", "problem_statement"}:
                 interpretation.assistant_response_kind = "receive_llm_question"
                 return "refine_selected", coach_metaphor(provider, user_input), [], interpretation

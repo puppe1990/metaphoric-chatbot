@@ -8,6 +8,7 @@ import { ChatShell } from "../../../components/chat-shell";
 import {
   AgentRequestError,
   getGuidedSessionView,
+  hasPendingFinalComparison,
   getProviderConfig,
   getSession,
   sendMessage,
@@ -82,6 +83,7 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
   const [isRecoverySaving, setIsRecoverySaving] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPollingFinalComparison, setIsPollingFinalComparison] = useState(false);
   const [modalModel, setModalModel] = useState("");
   const [modalProvider, setModalProvider] = useState("groq");
   const [pendingRecoveryMessage, setPendingRecoveryMessage] = useState<string | null>(null);
@@ -249,6 +251,48 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
     };
   }, [requestedMode, retryKey, router, token]);
 
+  useEffect(() => {
+    if (!sessionView || !hasPendingFinalComparison(sessionView)) {
+      setIsPollingFinalComparison(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsPollingFinalComparison(true);
+
+    async function poll() {
+      while (!cancelled) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        if (cancelled) {
+          return;
+        }
+
+        try {
+          const restored = await getSession(sessionView.token);
+          if (cancelled) {
+            return;
+          }
+
+          const nextView = getGuidedSessionView(restored);
+          setSessionView(nextView);
+          if (!hasPendingFinalComparison(nextView)) {
+            setIsPollingFinalComparison(false);
+            return;
+          }
+        } catch {
+          setIsPollingFinalComparison(false);
+          return;
+        }
+      }
+    }
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionView]);
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -400,14 +444,14 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
         <ChatShell
           activeModel={providerModel ?? undefined}
           activeProviderLabel={providerLabel ?? undefined}
-          inputDisabled={isLoading || isSubmitting || isRestarting || isRecoverySaving}
+          inputDisabled={isLoading || isSubmitting || isRestarting || isRecoverySaving || isPollingFinalComparison}
           isThinking={isSubmitting || isRecoverySaving}
           inputValue={draft}
           onInputChange={(event) => setDraft(event.target.value)}
           onInputValueChange={setDraft}
           onInputSubmit={handleSubmit}
           onRestart={handleRestart}
-          restartDisabled={isLoading || isSubmitting || isRestarting || isRecoverySaving}
+          restartDisabled={isLoading || isSubmitting || isRestarting || isRecoverySaving || isPollingFinalComparison}
           session={sessionView}
         />
       </div>

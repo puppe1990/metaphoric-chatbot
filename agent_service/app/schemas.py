@@ -27,11 +27,19 @@ class ArtifactMetadata(BaseModel):
     selected_option: ChoiceLabel | None = None
 
 
+class FinalMetaphorVariant(BaseModel):
+    style: str
+    title: str
+    status: str = "complete"
+    text: str = ""
+
+
 class ArtifactView(BaseModel):
     artifact_type: str
     content: str
     metadata: ArtifactMetadata | None = None
     choices: list[MetaphorChoice] = Field(default_factory=list)
+    comparison_variants: list[FinalMetaphorVariant] = Field(default_factory=list)
 
 
 class SessionContextUpdate(BaseModel):
