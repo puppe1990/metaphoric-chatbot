@@ -26,12 +26,14 @@ function findLatestAssistantMessageIndex(messages: ChatMessage[]) {
 export function MessageList({
   artifacts = [],
   disabled = false,
+  isThinking = false,
   messages,
   onChoiceSelect,
 }: {
   messages: ChatMessage[];
   artifacts?: ChatArtifact[];
   disabled?: boolean;
+  isThinking?: boolean;
   onChoiceSelect?: (label: "A" | "B" | "C") => void;
 }) {
   const receiveChoiceArtifact = [...artifacts].reverse().find(
@@ -59,6 +61,17 @@ export function MessageList({
           ) : null}
         </li>
       ))}
+      {isThinking ? (
+        <li
+          className={[
+            "mr-auto max-w-[88%] rounded-lg border border-ink/10 bg-white px-4 py-3 text-ink sm:px-5",
+            "animate-pulse",
+          ].join(" ")}
+        >
+          <p className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] opacity-70">Assistente</p>
+          <p className="whitespace-pre-wrap text-sm leading-6 sm:text-[0.98rem]">Pensando...</p>
+        </li>
+      ) : null}
     </ol>
   );
 }

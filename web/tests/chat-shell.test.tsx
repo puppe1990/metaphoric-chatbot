@@ -46,6 +46,112 @@ describe("ChatShell", () => {
     expect(input).toHaveValue("");
   });
 
+  it("renders the active provider and model when available", () => {
+    const session: GuidedSessionView = {
+      token: "tok_provider",
+      mode: "build",
+      title: "Construir minha metáfora",
+      description: "Transforme abstração em imagem com crítica técnica e reescrita guiada.",
+      progressLabel: "offer_symbolic_fields",
+      messages: [{ role: "assistant", content: "Escolha um campo simbólico para começar." }],
+      artifacts: [],
+      artifactTitle: "Mapa simbólico",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: [],
+    };
+
+    render(<ChatShell activeModel="llama-3.3-70b-versatile" activeProviderLabel="Groq" session={session} />);
+
+    expect(screen.getByText("Groq")).toBeInTheDocument();
+    expect(screen.getByText("llama-3.3-70b-versatile")).toBeInTheDocument();
+    expect(screen.getByText("Modelo ativo")).toBeInTheDocument();
+  });
+
+  it("renders a loading bubble under the latest message while the assistant is thinking", () => {
+    const session: GuidedSessionView = {
+      token: "tok_loading",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "present_choices",
+      messages: [
+        { role: "assistant", content: "Descreva o problema em uma frase simples." },
+        { role: "user", content: "Meu projeto trava quando precisa decidir." },
+      ],
+      artifacts: [],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: [],
+    };
+
+    render(<ChatShell inputDisabled isThinking session={session} />);
+
+    const transcriptItems = screen.getAllByRole("listitem");
+    const loadingBubble = transcriptItems[2];
+
+    expect(transcriptItems).toHaveLength(3);
+    expect(within(loadingBubble).getByText("Assistente")).toBeInTheDocument();
+    expect(within(loadingBubble).getByText("Pensando...")).toBeInTheDocument();
+  });
+
+  it("scrolls the transcript to the bottom when submit enters the thinking state", () => {
+    const session: GuidedSessionView = {
+      token: "tok_scroll_loading",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "present_choices",
+      messages: [
+        { role: "assistant", content: "Descreva o problema em uma frase simples." },
+        { role: "user", content: "Meu projeto trava quando precisa decidir." },
+      ],
+      artifacts: [],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: [],
+    };
+
+    const { container, rerender } = render(<ChatShell session={session} />);
+    const transcript = container.querySelector(".overflow-y-auto") as HTMLDivElement;
+
+    Object.defineProperty(transcript, "scrollHeight", {
+      configurable: true,
+      value: 480,
+    });
+    transcript.scrollTop = 0;
+
+    rerender(<ChatShell isThinking session={session} />);
+
+    expect(transcript.scrollTop).toBe(480);
+  });
+
+  it("uses the same visual treatment for the top action buttons", () => {
+    const session: GuidedSessionView = {
+      token: "tok_actions",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "intake_problem",
+      messages: [{ role: "assistant", content: "Descreva o problema em uma frase simples." }],
+      artifacts: [],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: [],
+    };
+
+    render(<ChatShell onRestart={() => {}} session={session} />);
+
+    const downloadButton = screen.getByRole("button", { name: "Baixar .md" });
+    const restartButton = screen.getByRole("button", { name: "Recomeçar" });
+
+    expect(downloadButton.className).toContain("rounded-xl");
+    expect(restartButton.className).toContain("rounded-xl");
+    expect(downloadButton.className).toContain("bg-white/90");
+    expect(restartButton.className).toContain("bg-white/90");
+    expect(downloadButton.className).toContain("hover:border-ink/20");
+    expect(restartButton.className).toContain("hover:border-ink/20");
+  });
+
   it("keeps the chat input pinned to the bottom edge while the transcript scrolls", () => {
     const session: GuidedSessionView = {
       token: "tok_layout",

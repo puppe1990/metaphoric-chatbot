@@ -34,29 +34,125 @@ GROQ_MODELS = [
 ]
 
 NVIDIA_MODELS = [
-    "meta/llama-3.3-70b-instruct",
-    "meta/llama-3.1-405b-instruct",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
     "meta/llama-3.1-70b-instruct",
     "meta/llama-3.1-8b-instruct",
-    "nvidia/llama-3.3-nemotron-super-49b-v1",
-    "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-    "nvidia/llama-3.1-nemotron-nano-8b-v1",
-    "mistralai/mistral-large",
-    "mistralai/mixtral-8x22b-instruct",
-    "mistralai/mixtral-8x7b-instruct",
-    "mistralai/mistral-7b-instruct-v0.3",
-    "microsoft/phi-3-medium-128k-instruct",
-    "microsoft/phi-4-mini-instruct",
-    "google/gemma-2-27b-it",
-    "qwen/qwen2.5-coder-32b-instruct",
-    "deepseek-ai/deepseek-r1",
-    "moonshotai/kimi-k2-instruct",
+    "meta/llama-3.3-70b-instruct",
+    "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    "nvidia/nemotron-3-nano",
+    "nvidia/nemotron-3-super-120b-a12b",
+    "bigcode/starcoder2-7b",
 ]
+
+PROVIDER_LABELS = {
+    "groq": "Groq",
+    "nvidia": "NVIDIA NIM",
+    "local": "Local (mock)",
+}
 
 
 class ProviderConfig(BaseModel):
     provider: str = "groq"
     model: str = "llama-3.3-70b-versatile"
+
+
+def _provider_label(provider: str) -> str:
+    return PROVIDER_LABELS.get(provider, provider)
+
+
+def _build_provider_error_detail(
+    *,
+    code: str,
+    message: str,
+    provider: str,
+    model: str,
+    retryable: bool,
+    action: str | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "code": code,
+        "message": message,
+        "provider": provider,
+        "model": model,
+        "retryable": retryable,
+    }
+    if action is not None:
+        payload["action"] = action
+    return payload
+
+
+def _translate_provider_exception(exc: Exception, config: ProviderConfig) -> HTTPException:
+    message = str(exc)
+    normalized_message = message.lower()
+    provider_label = _provider_label(config.provider)
+    provider_with_model = f"{provider_label} / {config.model}"
+
+    if (
+        "end of life" in normalized_message
+        or "no longer available" in normalized_message
+        or "[410]" in normalized_message
+    ):
+        return HTTPException(
+            status_code=503,
+            detail=_build_provider_error_detail(
+                code="provider_model_unavailable",
+                message=(
+                    f"O modelo {provider_with_model} não está mais disponível. "
+                    "Troque de modelo ou provider para continuar."
+                ),
+                provider=config.provider,
+                model=config.model,
+                retryable=False,
+                action="switch_provider_or_model",
+            ),
+        )
+
+    if isinstance(exc, RateLimitError) or "rate_limit" in normalized_message or "[429]" in normalized_message:
+        return HTTPException(
+            status_code=429,
+            detail=_build_provider_error_detail(
+                code="provider_rate_limit",
+                message=(
+                    f"O provider {provider_with_model} atingiu o limite de uso agora. "
+                    "Espere um pouco ou troque de provider/modelo para continuar."
+                ),
+                provider=config.provider,
+                model=config.model,
+                retryable=True,
+                action="switch_provider_or_model",
+            ),
+        )
+
+    if "api key" in normalized_message or "not set" in normalized_message or "unavailable" in normalized_message:
+        return HTTPException(
+            status_code=503,
+            detail=_build_provider_error_detail(
+                code="provider_configuration_error",
+                message=(
+                    f"O provider {provider_label} não está pronto para uso nesta instalação. "
+                    "Troque de provider/modelo ou ajuste a configuração do backend."
+                ),
+                provider=config.provider,
+                model=config.model,
+                retryable=False,
+                action="switch_provider_or_model",
+            ),
+        )
+
+    return HTTPException(
+        status_code=502,
+        detail=_build_provider_error_detail(
+            code="provider_request_failed",
+            message=(
+                f"A resposta do provider {provider_with_model} falhou desta vez. "
+                "Tente novamente ou troque de provider/modelo se o erro continuar."
+            ),
+            provider=config.provider,
+            model=config.model,
+            retryable=True,
+        ),
+    )
 
 
 def get_default_database_url() -> str:
@@ -258,6 +354,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         repo = SessionRepository(db)
         session = get_session_or_404(db, payload.token)
         existing_messages = list_session_messages(db, session.id)
+        provider_config = _load_provider_config(db)
 
         prior_state = session.state
         next_state = advance_mode(session.mode, prior_state)
@@ -272,11 +369,8 @@ def create_app(database_url: str | None = None) -> FastAPI:
                 user_input=build_contextual_user_input(existing_messages, content),
                 provider_factory=lambda: resolve_provider(db),
             )
-        except RateLimitError as exc:
-            raise HTTPException(
-                status_code=429,
-                detail="AI rate limit reached. Please wait a few minutes and try again.",
-            ) from exc
+        except Exception as exc:
+            raise _translate_provider_exception(exc, provider_config) from exc
 
         db.add(
             MessageRecord(
