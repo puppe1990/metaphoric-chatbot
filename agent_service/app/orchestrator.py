@@ -3,8 +3,10 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from app.agents import (
+    TurnInterpretation,
     coach_metaphor,
-    generate_receive_choices,
+    generate_contextual_choices,
+    interpret_turn,
 )
 from app.schemas import ArtifactView
 from app.state_machine import next_state
@@ -31,34 +33,42 @@ def build_assistant_message(
     state: str,
     user_input: str,
     provider_factory: Callable[[], object],
-) -> tuple[str, str, list[ArtifactView]]:
+) -> tuple[str, str, list[ArtifactView], TurnInterpretation | None]:
     if mode == "receive":
         if state == "intake_problem":
-            return state, "Descreva o problema em uma frase simples.", []
+            return state, "Descreva o problema em uma frase simples.", [], None
         if state == "generate_candidates":
-            artifact = generate_receive_choices(provider_factory(), user_input)
-            return "present_choices", artifact.content, [artifact]
-        if state == "present_choices":
-            return state, "Escolha A, B ou C para continuarmos.", []
-        if state == "refine_selected":
-            return state, REFINE_SELECTED_MESSAGE, []
+            provider = provider_factory()
+            artifact = generate_contextual_choices(provider, user_input)
+            interpretation = interpret_turn(provider, current_state=state, user_input=user_input)
+            return "present_choices", artifact.content, [artifact], interpretation
+        if state in {"present_choices", "refine_selected"}:
+            provider = provider_factory()
+            interpretation = interpret_turn(provider, current_state=state, user_input=user_input)
+            if interpretation.intent == "agent_option_selection":
+                return "refine_selected", REFINE_SELECTED_MESSAGE, [], interpretation
+            if interpretation.intent in {"user_introduced_metaphor", "refinement_request"}:
+                return "refine_selected", coach_metaphor(provider, user_input), [], interpretation
+            artifact = generate_contextual_choices(provider, user_input)
+            return "present_choices", artifact.content, [artifact], interpretation
 
     if mode == "build":
         if state == "intake_problem":
-            return state, "Descreva o problema em uma frase simples.", []
+            return state, "Descreva o problema em uma frase simples.", [], None
         if state == "identify_core_conflict":
-            return state, "Se isso tivesse um conflito central, qual seria em poucas palavras?", []
+            return state, "Se isso tivesse um conflito central, qual seria em poucas palavras?", [], None
         if state == "offer_symbolic_fields":
             return (
                 state,
                 "Isso parece mais uma porta emperrada, um rio barrado, uma engrenagem "
                 "presa, um motor acelerado ou uma bússola girando?",
                 [],
+                None,
             )
         if state in {"user_selects_symbol", "user_attempt", "coach_feedback", "rewrite_together"}:
-            return state, coach_metaphor(provider_factory(), user_input), []
+            return state, coach_metaphor(provider_factory(), user_input), [], None
 
-    return state, "Vamos continuar.", []
+    return state, "Vamos continuar.", [], None
 
 
 def advance_mode(mode: str, current_state: str) -> str:

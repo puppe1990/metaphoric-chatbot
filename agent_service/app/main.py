@@ -9,7 +9,6 @@ from app.config import get_allowed_origins, load_environment_file
 from app.db import SessionLocal, init_db
 from app.models import ArtifactRecord, MessageRecord, SessionRecord
 from app.orchestrator import (
-    REFINE_SELECTED_MESSAGE,
     advance_mode,
     build_assistant_message,
     start_assistant_message,
@@ -171,51 +170,14 @@ def create_app(database_url: str | None = None) -> FastAPI:
         session = get_session_or_404(db, payload.token)
         existing_messages = list_session_messages(db, session.id)
 
-        if session.mode == "receive" and session.state == "present_choices" and content in RECEIVE_SELECTIONS:
-            updated_artifact = repo.update_latest_artifact_metadata(
-                session_id=session.id,
-                artifact_type="receive_choice",
-                metadata={"selected_option": content},
-            )
-            if updated_artifact is None:
-                raise HTTPException(
-                    status_code=409,
-                    detail="No receive choice artifact found for selection.",
-                )
-
-            db.add(
-                MessageRecord(
-                    session_id=session.id,
-                    role="user",
-                    content=content,
-                    step=session.state,
-                )
-            )
-            session.state = "refine_selected"
-            db.add(
-                MessageRecord(
-                    session_id=session.id,
-                    role="assistant",
-                    content=REFINE_SELECTED_MESSAGE,
-                    step=session.state,
-                )
-            )
-            db.commit()
-            db.refresh(session)
-
-            return {
-                "token": session.token,
-                "mode": session.mode,
-                "state": session.state,
-                "assistant_message": REFINE_SELECTED_MESSAGE,
-                "messages": serialize_messages(list_session_messages(db, session.id)),
-                "artifacts": serialize_artifacts(list_session_artifacts(db, session.id)),
-            }
-
         next_state = advance_mode(session.mode, session.state)
-        resolved_state, assistant_message, artifacts = build_assistant_message(
+        state_for_response = next_state
+        if session.mode == "receive" and session.state in {"present_choices", "refine_selected"}:
+            state_for_response = session.state
+
+        resolved_state, assistant_message, artifacts, interpretation = build_assistant_message(
             mode=session.mode,
-            state=next_state,
+            state=state_for_response,
             user_input=build_contextual_user_input(existing_messages, content),
             provider_factory=create_provider,
         )
@@ -229,6 +191,27 @@ def create_app(database_url: str | None = None) -> FastAPI:
             )
         )
         session.state = resolved_state
+        if interpretation is not None:
+            repo.update_session_context(
+                session_id=session.id,
+                context={
+                    "active_metaphor_seed": interpretation.active_metaphor_seed,
+                    "last_user_intent": interpretation.intent,
+                    "sensory_mode": interpretation.sensory_mode,
+                    "suggestion_basis": interpretation.suggestion_basis,
+                },
+            )
+            if interpretation.intent == "agent_option_selection" and content in RECEIVE_SELECTIONS:
+                updated_artifact = repo.update_latest_artifact_metadata(
+                    session_id=session.id,
+                    artifact_type="receive_choice",
+                    metadata={"selected_option": content},
+                )
+                if updated_artifact is None:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="No receive choice artifact found for selection.",
+                    )
         db.add(
             MessageRecord(
                 session_id=session.id,

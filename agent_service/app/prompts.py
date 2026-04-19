@@ -48,8 +48,16 @@ Return compact JSON with:
 - suggestion_basis
 Rules:
 - write in Brazilian Portuguese-compatible semantics
-- if the user introduces a new image, prefer user_introduced_metaphor
+- return valid JSON only
+- if the user introduces a concrete new image or scene, prefer user_introduced_metaphor
+- literal phrases about conversations, work problems, or difficult situations
+  are problem_statement unless they introduce a concrete image
+- do not treat literal problem statements with articles like
+  "um problema", "uma dificuldade", "um conflito" as user_introduced_metaphor
 - if the user asks to adjust wording, use refinement_request
+- short rewrite asks like "mais curta", "mais concreta", "mais direta",
+  "reescreve" and "ajusta isso" are refinement_request
+- replies like "não sei", "sei lá", "tanto faz", "talvez", "não tenho certeza" are ambiguous
 - if the user literally answers A, B, or C, use agent_option_selection
 """
 

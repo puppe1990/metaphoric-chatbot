@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 
 from pydantic import BaseModel
@@ -10,6 +11,7 @@ from .prompts import (
     GENERATOR_PROMPT,
     RECEIVE_CHOICES_PROMPT,
     RECEIVE_CONTEXTUAL_PROMPT,
+    TURN_INTERPRETER_PROMPT,
 )
 from .providers.base import ChatProvider
 from .schemas import ArtifactMetadata, ArtifactView, MetaphorChoice, TurnIntent
@@ -38,19 +40,15 @@ def coach_metaphor(provider: ChatProvider, user_input: str) -> str:
 
 
 def interpret_turn(provider: ChatProvider, current_state: str, user_input: str) -> TurnInterpretation:
-    del provider, current_state
-
-    latest = _latest_user_problem(user_input)
-    if latest.upper() in CHOICE_LABELS:
-        return TurnInterpretation(intent="agent_option_selection", suggestion_basis="literal-choice")
-    if re.search(r"\b(um|uma)\b", latest, flags=re.IGNORECASE):
-        return TurnInterpretation(
-            intent="user_introduced_metaphor",
-            active_metaphor_seed=latest,
-            sensory_mode="visual",
-            suggestion_basis="derived-from-user-image",
-        )
-    return TurnInterpretation(intent="problem_statement", suggestion_basis="derived-from-user-problem")
+    prompt_input = f"current_state: {current_state}\n{user_input}"
+    try:
+        raw_output = provider.invoke_chat(TURN_INTERPRETER_PROMPT, prompt_input)
+    except Exception:
+        return _fallback_turn_interpretation(user_input)
+    parsed = _parse_turn_interpretation(raw_output)
+    if parsed is not None:
+        return parsed
+    return _fallback_turn_interpretation(user_input)
 
 
 def generate_receive_choices(provider: ChatProvider, user_input: str) -> ArtifactView:
@@ -77,7 +75,7 @@ def generate_contextual_choices(provider: ChatProvider, user_input: str) -> Arti
     choices = _parse_receive_choices(raw_output) or _fallback_receive_choices(user_input)
     return ArtifactView(
         artifact_type="receive_choice",
-        content=_format_receive_choices_content(choices),
+        content=_format_contextual_choices_content(choices),
         metadata=ArtifactMetadata(
             clarifier_asked=False,
             internal_candidate_count=len(choices),
@@ -98,7 +96,7 @@ def hydrate_receive_choice_artifact(
     metadata_model = ArtifactMetadata.model_validate(metadata or {})
     return ArtifactView(
         artifact_type="receive_choice",
-        content=_format_receive_choices_content(choices),
+        content=content if _is_contextual_choice_content(content) else _format_receive_choices_content(choices),
         metadata=metadata_model,
         choices=choices,
     )
@@ -135,7 +133,14 @@ def _fallback_receive_choices(user_input: str) -> list[MetaphorChoice]:
     scene = problem or "isso"
     normalized_problem = problem.lower()
 
-    if any(token in normalized_problem for token in ("bloque", "trava", "trav", "pres")):
+    if _has_sea_metaphor_language(normalized_problem):
+        return [
+            MetaphorChoice(label="A", text="Como um barco sem bússola rodando em círculos no mesmo trecho do oceano."),
+            MetaphorChoice(label="B", text="Como um casco pequeno apanhando de ondas grandes sem ver a costa."),
+            MetaphorChoice(label="C", text="Como um barco perdido sob neblina, ouvindo o mar mas sem achar direção."),
+        ]
+
+    if _has_stuck_language(normalized_problem):
         return [
             MetaphorChoice(label="A", text="Como um corredor estreito entupido de caixas."),
             MetaphorChoice(label="B", text="Como um motor que gira e nao engata."),
@@ -172,8 +177,172 @@ def _latest_user_problem(user_input: str) -> str:
     return user_input.strip()
 
 
+def _parse_turn_interpretation(raw_output: str) -> TurnInterpretation | None:
+    try:
+        payload = json.loads(raw_output)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    try:
+        return TurnInterpretation.model_validate(payload)
+    except Exception:
+        return None
+
+
+def _fallback_turn_interpretation(user_input: str) -> TurnInterpretation:
+    latest = _latest_user_problem(user_input)
+    normalized = latest.strip().lower()
+
+    if latest.upper() in CHOICE_LABELS:
+        return TurnInterpretation(intent="agent_option_selection", suggestion_basis="deterministic-fallback")
+
+    if _is_ambiguous_reply(normalized):
+        return TurnInterpretation(intent="ambiguous", suggestion_basis="deterministic-fallback")
+
+    if _is_refinement_request(normalized):
+        return TurnInterpretation(
+            intent="refinement_request",
+            sensory_mode="verbal",
+            suggestion_basis="deterministic-fallback",
+        )
+
+    if _looks_like_user_metaphor(normalized):
+        return TurnInterpretation(
+            intent="user_introduced_metaphor",
+            active_metaphor_seed=latest,
+            sensory_mode="visual",
+            suggestion_basis="deterministic-fallback",
+        )
+
+    return TurnInterpretation(
+        intent="problem_statement",
+        sensory_mode="kinesthetic",
+        suggestion_basis="deterministic-fallback",
+    )
+
+
+def _is_ambiguous_reply(normalized: str) -> bool:
+    return normalized in {
+        "não sei",
+        "nao sei",
+        "talvez",
+        "tanto faz",
+        "não tenho certeza",
+        "nao tenho certeza",
+        "sei lá",
+        "sei la",
+    }
+
+
+def _is_refinement_request(normalized: str) -> bool:
+    direct_markers = {
+        "mais curta",
+        "mais curto",
+        "mais concreta",
+        "mais concreto",
+        "mais direta",
+        "mais direto",
+        "mais poética",
+        "mais poetica",
+        "menos poética",
+        "menos poetica",
+        "reescreve",
+        "reescrever",
+        "ajusta",
+        "ajusta isso",
+    }
+    if normalized in direct_markers:
+        return True
+    return bool(re.match(r"^(reescreve|reescrever|ajusta)\b", normalized, flags=re.IGNORECASE))
+
+
+def _looks_like_user_metaphor(normalized: str) -> bool:
+    concrete_image_markers = (
+        "barco",
+        "navio",
+        "oceano",
+        "mar",
+        "costa",
+        "bussola",
+        "bússola",
+        "onda",
+        "ondas",
+        "neblina",
+        "rio",
+        "porta",
+        "gaveta",
+        "motor",
+        "corredor",
+    )
+
+    literal_problem_markers = (
+        "problema",
+        "dificuldade",
+        "conflito",
+        "situação",
+        "situacao",
+        "questão",
+        "questao",
+        "coisa",
+        "negócio",
+        "negocio",
+        "trabalho",
+        "conversa",
+        "reunião",
+        "reuniao",
+        "discussão",
+        "discussao",
+        "chefe",
+    )
+    if any(marker in normalized for marker in literal_problem_markers):
+        return False
+
+    article_led = re.match(r"^(?:(?:como|parece|soa como|vira|e como)\s+)?(um|uma)\b", normalized, flags=re.IGNORECASE)
+    if article_led:
+        return True
+
+    return any(
+        re.search(rf"\b{re.escape(marker)}\b", normalized, flags=re.IGNORECASE) for marker in concrete_image_markers
+    )
+
+
+def _has_stuck_language(normalized: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(bloquead[oa]s?|bloqueio|travad[oa]s?|trava(?:do|da)?|pres[oa]s?)\b",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def _has_sea_metaphor_language(normalized: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(barco|navio|oceano|mar|costa|bússola|bussola|onda|ondas|neblina)\b",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def _is_contextual_choice_content(content: str) -> bool:
+    lowered = content.lower()
+    return "aqui vao tres possibilidades" in lowered and "escolha a imagem" not in lowered
+
+
 def _format_receive_choices_content(choices: list[MetaphorChoice]) -> str:
     lines = ["Escolha a imagem que mais acerta o problema agora:"]
     lines.extend(f"{choice.label}. {choice.text}" for choice in choices)
     lines.append("Escolha A, B ou C.")
+    return "\n".join(lines)
+
+
+def _format_contextual_choices_content(choices: list[MetaphorChoice]) -> str:
+    lines = ["Aqui vao tres possibilidades para seguir nessa imagem:"]
+    lines.extend(f"{choice.label}. {choice.text}" for choice in choices)
+    lines.append("Se alguma acertar, eu desenvolvo por esse caminho.")
     return "\n".join(lines)

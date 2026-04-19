@@ -44,3 +44,9 @@ Do not commit `.env` secrets or local database contents. Keep CORS, provider key
 
 ## Agent-Specific Notes
 When improving the chat agent, always consult `livros_metafora/` first. Treat that folder as the primary local reference for refining prompt tone, metaphor quality, coaching behavior, and domain grounding before changing `agent_service/app/agents.py`, `agent_service/app/prompts.py`, or orchestration logic.
+
+## Receive Mode Notes
+Receive mode now interprets user turns semantically. Contributors changing `agent_service/app/prompts.py`, `agent_service/app/agents.py`, `agent_service/app/orchestrator.py`, or `agent_service/app/providers/local_provider.py` must verify that:
+
+- user-supplied metaphors become the active refinement seed instead of being discarded for generic menu choices
+- contextual receive artifacts keep their non-quiz copy when persisted and reloaded

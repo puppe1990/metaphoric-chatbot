@@ -34,12 +34,50 @@ class LocalProvider:
 
         if system_prompt == TURN_INTERPRETER_PROMPT:
             latest = self._latest_user_line(user_prompt)
+            latest_normalized = latest.strip().lower()
             if latest.upper() in {"A", "B", "C"}:
                 return (
                     '{"intent":"agent_option_selection","active_metaphor_seed":null,'
                     '"sensory_mode":null,"suggestion_basis":"literal-choice"}'
                 )
-            if re.search(r"\b(um|uma)\b", latest, flags=re.IGNORECASE):
+            if latest_normalized in {
+                "não sei",
+                "nao sei",
+                "talvez",
+                "tanto faz",
+                "não tenho certeza",
+                "nao tenho certeza",
+                "sei lá",
+                "sei la",
+            }:
+                return (
+                    '{"intent":"ambiguous","active_metaphor_seed":null,'
+                    '"sensory_mode":null,"suggestion_basis":"unclear-user-signal"}'
+                )
+            if any(
+                latest_normalized == marker
+                for marker in (
+                    "mais curta",
+                    "mais curto",
+                    "mais concreta",
+                    "mais concreto",
+                    "mais direta",
+                    "mais direto",
+                    "mais poética",
+                    "mais poetica",
+                    "menos poética",
+                    "menos poetica",
+                    "reescreve",
+                    "reescrever",
+                    "ajusta",
+                    "ajusta isso",
+                )
+            ) or re.match(r"^(reescreve|reescrever|ajusta)\b", latest_normalized, flags=re.IGNORECASE):
+                return (
+                    '{"intent":"refinement_request","active_metaphor_seed":null,'
+                    '"sensory_mode":"verbal","suggestion_basis":"user-asked-to-adjust-wording"}'
+                )
+            if self._looks_like_user_metaphor(latest):
                 return json.dumps(
                     {
                         "intent": "user_introduced_metaphor",
@@ -56,13 +94,19 @@ class LocalProvider:
 
         if system_prompt == RECEIVE_CONTEXTUAL_PROMPT:
             latest = self._latest_user_line(user_prompt).lower()
-            if "bloque" in latest or "trava" in latest:
+            if self._has_sea_metaphor_language(latest):
+                return (
+                    "A. Como um barco sem bússola rodando em círculos no mesmo trecho do oceano.\n"
+                    "B. Como um casco pequeno apanhando de ondas grandes sem ver a costa.\n"
+                    "C. Como um barco perdido sob neblina, ouvindo o mar mas sem achar direção.\n"
+                )
+            if self._has_stuck_language(latest):
                 return (
                     "A. Como um corredor estreito entupido de caixas.\n"
                     "B. Como um motor que gira e não engata.\n"
                     "C. Como água presa atrás de uma comporta.\n"
                 )
-            return self._receive_choices_response(user_prompt)
+            return self._contextual_choices_response(user_prompt)
 
         if system_prompt == COACH_PROMPT:
             return self._coach_response(user_prompt)
@@ -118,11 +162,95 @@ class LocalProvider:
             "Escolha A, B ou C."
         )
 
+    def _contextual_choices_response(self, user_prompt: str) -> str:
+        user_lines = [
+            line.split(":", 1)[1].strip()
+            for line in user_prompt.splitlines()
+            if line.lower().startswith("user:") and ":" in line
+        ]
+        latest = user_lines[-1] if user_lines else user_prompt.strip()
+        scene = latest.rstrip(".!?") or "isso"
+
+        return (
+            "A. Como um carro girando em falso na lama: faz barulho, força o motor, mas não sai do lugar em "
+            f"{scene}.\n"
+            f"B. Como uma gaveta emperrada: você puxa, hesita, solta, e tudo fica preso no meio em {scene}.\n"
+            "C. Como três rádios ligados ao mesmo tempo: sinais disputam espaço "
+            f"e nenhuma música consegue abrir caminho em {scene}.\n"
+        )
+
     def _extract_symbol(self, text: str) -> str | None:
         match = re.search(r"\b(um|uma)\s+([^.\n]+)", text, flags=re.IGNORECASE)
         if not match:
             return None
         return f"{match.group(1).lower()} {match.group(2).strip()}"
+
+    def _looks_like_user_metaphor(self, text: str) -> bool:
+        normalized = text.strip().lower()
+        concrete_image_markers = (
+            "barco",
+            "navio",
+            "oceano",
+            "mar",
+            "costa",
+            "bussola",
+            "bússola",
+            "onda",
+            "ondas",
+            "neblina",
+            "rio",
+            "porta",
+            "gaveta",
+            "motor",
+            "corredor",
+        )
+
+        literal_problem_markers = (
+            "problema",
+            "dificuldade",
+            "conflito",
+            "situação",
+            "situacao",
+            "questão",
+            "questao",
+            "coisa",
+            "negócio",
+            "negocio",
+            "trabalho",
+            "conversa",
+            "reunião",
+            "reuniao",
+            "discussão",
+            "discussao",
+            "chefe",
+        )
+        if any(marker in normalized for marker in literal_problem_markers):
+            return False
+
+        if re.match(r"^(?:(?:como|parece|soa como|vira|e como)\s+)?(um|uma)\b", normalized, flags=re.IGNORECASE):
+            return True
+
+        return any(
+            re.search(rf"\b{re.escape(marker)}\b", normalized, flags=re.IGNORECASE) for marker in concrete_image_markers
+        )
+
+    def _has_stuck_language(self, normalized: str) -> bool:
+        return bool(
+            re.search(
+                r"\b(bloquead[oa]s?|bloqueio|travad[oa]s?|trava(?:do|da)?|pres[oa]s?)\b",
+                normalized,
+                flags=re.IGNORECASE,
+            )
+        )
+
+    def _has_sea_metaphor_language(self, normalized: str) -> bool:
+        return bool(
+            re.search(
+                r"\b(barco|navio|oceano|mar|costa|bússola|bussola|onda|ondas|neblina)\b",
+                normalized,
+                flags=re.IGNORECASE,
+            )
+        )
 
     def _latest_user_line(self, user_prompt: str) -> str:
         user_lines = [
