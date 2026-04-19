@@ -23,12 +23,12 @@ describe("ChatShell", () => {
       <ChatShell session={session} />,
     );
 
-    expect(screen.getByRole("link", { name: "Voltar ao início" })).toHaveAttribute("href", "/");
-    expect(screen.getByText("Receber uma metáfora")).toBeInTheDocument();
     expect(screen.getByText("Intake Problem")).toBeInTheDocument();
-    expect(screen.getByText("tok_123", { selector: "header span" })).toBeInTheDocument();
     expect(screen.getByText("Descreva o problema em uma frase simples.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Receber metáfora" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Receber metáfora" })).not.toBeInTheDocument();
+    expect(screen.queryByText("tok_123")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Voltar ao início" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Baixar .md" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "O que está travando?" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Onde a tensão aparece?" })).toBeInTheDocument();
     expect(

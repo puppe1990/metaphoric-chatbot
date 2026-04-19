@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChatShell } from "../../../components/chat-shell";
-import { SessionRestoreBanner } from "../../../components/session-restore-banner";
 import {
   getGuidedSessionView,
   getSession,
@@ -173,7 +172,6 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
               {error}
             </div>
           ) : null}
-          <SessionRestoreBanner currentSession={{ mode: sessionView.mode, progressLabel: sessionView.progressLabel, token: sessionView.token }} />
         </div>
       </div>
       <div className="min-h-0">

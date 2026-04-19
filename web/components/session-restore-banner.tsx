@@ -9,16 +9,18 @@ type SessionRestoreBannerProps = {
   currentSession: Omit<RecentSession, "updatedAt">;
 };
 
+function getOtherRecentSessions(currentSession: Omit<RecentSession, "updatedAt">) {
+  return loadRecentSessions().filter(
+    (session) => session.token !== currentSession.token || session.mode !== currentSession.mode,
+  );
+}
+
 export function SessionRestoreBanner({ currentSession }: SessionRestoreBannerProps) {
-  const [recentSessions, setRecentSessions] = useState<RecentSession[]>([]);
+  const [recentSessions, setRecentSessions] = useState<RecentSession[]>(() => getOtherRecentSessions(currentSession));
 
   useEffect(() => {
     rememberRecentSession(currentSession);
-    setRecentSessions(
-      loadRecentSessions().filter(
-        (session) => session.token !== currentSession.token || session.mode !== currentSession.mode,
-      ),
-    );
+    setRecentSessions(getOtherRecentSessions(currentSession));
   }, [currentSession]);
 
   if (recentSessions.length === 0) {

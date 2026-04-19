@@ -1,6 +1,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { AppHeader } from "../components/app-header";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,7 +16,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AppHeader />
+        {children}
+      </body>
     </html>
   );
 }

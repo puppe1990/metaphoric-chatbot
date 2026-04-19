@@ -2,7 +2,6 @@
 
 import React from "react";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { ChatInput } from "./chat-input";
 import { MessageList } from "./message-list";
 import { ProgressChip } from "./progress-chip";
@@ -97,50 +96,29 @@ export function ChatShell({
   return (
     <section className="h-full min-h-0 px-3 pb-3 text-ink sm:px-5">
       <div className="mx-auto grid h-full min-h-0 max-w-5xl grid-rows-[auto_1fr] overflow-hidden rounded-lg border border-ink/10 bg-white/82 shadow-[0_24px_80px_rgba(23,25,18,0.12)] backdrop-blur">
-        <header className="border-b border-ink/10 bg-white/78 px-4 py-4 sm:px-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-clay">{session.title}</p>
-              <h1 className="mt-2 text-2xl font-semibold leading-tight tracking-tight text-ink sm:text-3xl">
-                {session.mode === "build" ? "Construir metáfora" : "Receber metáfora"}
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-clay">{session.description}</p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 md:justify-end">
-              <Link
-                href="/"
-                className="rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-fog"
-              >
-                Voltar ao início
-              </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink/10 bg-white/78 px-4 py-4 sm:px-6">
+          <ProgressChip label={session.progressLabel} />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className="rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-fog disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={inputDisabled}
+              onClick={() => downloadChatMarkdown(session)}
+              type="button"
+            >
+              Baixar .md
+            </button>
+            {onRestart ? (
               <button
-                className="rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-fog disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={inputDisabled}
-                onClick={() => downloadChatMarkdown(session)}
+                className="rounded-lg border border-ink/10 bg-fog px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={restartDisabled}
+                onClick={onRestart}
                 type="button"
               >
-                Baixar .md
+                Recomeçar
               </button>
-              <ProgressChip label={session.progressLabel} />
-              {onRestart ? (
-                <button
-                  className="rounded-lg border border-ink/10 bg-fog px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={restartDisabled}
-                  onClick={onRestart}
-                  type="button"
-                >
-                  Recomeçar
-                </button>
-              ) : null}
-            </div>
+            ) : null}
           </div>
-          {session.token ? (
-            <p className="mt-3 truncate text-xs text-clay">
-              Sessão <span className="font-medium text-ink">{session.token}</span>
-            </p>
-          ) : null}
-        </header>
+        </div>
 
         <section className="grid min-h-0 grid-rows-[1fr_auto]">
           <div className="min-h-0 overflow-y-auto px-4 py-5 sm:px-6" ref={transcriptRef}>

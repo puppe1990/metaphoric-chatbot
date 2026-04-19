@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatSessionPageClient } from "../app/c/[token]/chat-session-page-client";
+import { clearRecentSessions } from "../lib/session";
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock("next/navigation", () => ({
 describe("ChatSessionPageClient", () => {
   beforeEach(() => {
     router.replace.mockReset();
+    clearRecentSessions();
   });
 
   afterEach(() => {
@@ -102,5 +104,36 @@ describe("ChatSessionPageClient", () => {
     fireEvent.click(suggestion);
 
     expect(screen.getByLabelText("Message input")).toHaveValue("Quero chegar em alguém por quem sinto atração.");
+  });
+
+  it("does not render the restore banner inside the chat page", async () => {
+    window.localStorage.setItem(
+      "metaphoric-chatbot:recent-sessions",
+      JSON.stringify([
+        { token: "tok_old", mode: "build", progressLabel: "rewrite_together", updatedAt: "2026-04-17T10:00:00.000Z" },
+      ]),
+    );
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            token: "receive_token",
+            mode: "receive",
+            state: "intake_problem",
+            messages: [{ role: "assistant", content: "Descreva o problema em uma frase simples." }],
+            artifacts: [],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    render(<ChatSessionPageClient requestedMode="receive" token="receive_token" />);
+
+    expect(await screen.findByText("Descreva o problema em uma frase simples.")).toBeInTheDocument();
+    expect(screen.queryByText("Restaurar sessão")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sessões recentes salvas neste navegador.")).not.toBeInTheDocument();
   });
 });

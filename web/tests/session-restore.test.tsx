@@ -62,27 +62,53 @@ describe("session restore", () => {
   });
 
   it("renders restore links for prior sessions", async () => {
-    window.localStorage.setItem(
-      "metaphoric-chatbot:recent-sessions",
-      JSON.stringify([
-        { token: "tok_old", mode: "build", progressLabel: "sharpen_image", updatedAt: "2026-04-17T10:00:00.000Z" },
-      ]),
-    );
+    const originalLocalStorage = window.localStorage;
+    const storage = new Map<string, string>();
 
-    render(
-      <SessionRestoreBanner
-        currentSession={{ token: "tok_current", mode: "receive", progressLabel: "intake_problem" }}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText("Restaurar sessão")).toBeInTheDocument();
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: (key: string) => (storage.has(key) ? storage.get(key)! : null),
+        setItem: (key: string, value: string) => {
+          storage.set(key, value);
+        },
+        removeItem: (key: string) => {
+          storage.delete(key);
+        },
+        clear: () => {
+          storage.clear();
+        },
+      },
     });
 
-    expect(screen.getByRole("link", { name: /Construir · sharpen_image/i })).toHaveAttribute(
-      "href",
-      "/c/tok_old?mode=build",
-    );
-    expect(screen.getByText(/1 disponíveis/i)).toBeInTheDocument();
+    try {
+      window.localStorage.setItem(
+        "metaphoric-chatbot:recent-sessions",
+        JSON.stringify([
+          { token: "tok_old", mode: "build", progressLabel: "sharpen_image", updatedAt: "2026-04-17T10:00:00.000Z" },
+        ]),
+      );
+
+      render(
+        <SessionRestoreBanner
+          currentSession={{ token: "tok_current", mode: "receive", progressLabel: "intake_problem" }}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Restaurar sessão")).toBeInTheDocument();
+      });
+
+      expect(screen.getByRole("link", { name: /Construir · sharpen_image/i })).toHaveAttribute(
+        "href",
+        "/c/tok_old?mode=build",
+      );
+      expect(screen.getByText(/1 disponíveis/i)).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        value: originalLocalStorage,
+      });
+    }
   });
 });
