@@ -132,7 +132,7 @@ export default function ConfigPage() {
                     inputId="model-select"
                     options={modelOptions}
                     value={selectedOption}
-                    onChange={(opt) => opt && setModel(opt.value)}
+                    onChange={(opt) => opt && !Array.isArray(opt) && setModel((opt as Option).value)}
                     styles={selectStyles}
                     isSearchable
                     placeholder="Selecione um modelo…"
