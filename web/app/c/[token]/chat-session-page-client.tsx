@@ -257,6 +257,7 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
       return;
     }
 
+    const sessionToken = sessionView.token;
     let cancelled = false;
     setIsPollingFinalComparison(true);
 
@@ -268,7 +269,7 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
         }
 
         try {
-          const restored = await getSession(sessionView.token);
+          const restored = await getSession(sessionToken);
           if (cancelled) {
             return;
           }
