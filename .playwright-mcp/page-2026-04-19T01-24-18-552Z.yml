@@ -1,0 +1,7 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - paragraph [ref=e4]: Iniciando sessão
+      - heading "O chat depende do agent service." [level=1] [ref=e5]
+      - paragraph [ref=e6]: Tentando conectar e recuperar o estado desta conversa.
+  - alert [ref=e7]

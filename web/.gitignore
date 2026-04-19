@@ -1,0 +1,4 @@
+.next/
+.node-localstorage
+node_modules/
+tsconfig.tsbuildinfo

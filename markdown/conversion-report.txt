@@ -1,0 +1,45 @@
+Conversao de livros para Markdown com MarkItDown
+
+Convertidos: 35
+Ignorados: 0
+Falhas: 0
+
+Detalhes:
+- CONVERTED: Frogs into Princes_ Neuro Linguistic Progr - Richard Wayne Bandler.txt -> Frogs into Princes_ Neuro Linguistic Progr - Richard Wayne Bandler.md
+- CONVERTED: How To Analyze People_ 13 Laws About the M - Daniel Spade.txt -> How To Analyze People_ 13 Laws About the M - Daniel Spade.md
+- CONVERTED: How to Make Money Online with ChatGPT_ The - Fitzgerald, Brian Scott.txt -> How to Make Money Online with ChatGPT_ The - Fitzgerald, Brian Scott.md
+- CONVERTED: How to Make People Like You In 90 Seconds - Boothman, Nicholas.txt -> How to Make People Like You In 90 Seconds - Boothman, Nicholas.md
+- CONVERTED: Hypnosis_ Attracting Your Success- Mind Co - Price, Victoria.txt -> Hypnosis_ Attracting Your Success- Mind Co - Price, Victoria.md
+- CONVERTED: Manipulation Techniques_ How to understand - Moore, David Cliff.txt -> Manipulation Techniques_ How to understand - Moore, David Cliff.md
+- CONVERTED: Modeling With NLP (Robert Dilts) (Z-Librar - Unknown.txt -> Modeling With NLP (Robert Dilts) (Z-Librar - Unknown.md
+- CONVERTED: Natural Game The System for Being a Natura - Unknown.txt -> Natural Game The System for Being a Natura - Unknown.md
+- CONVERTED: NLP - Tom Hoobyar.txt -> NLP - Tom Hoobyar.md
+- CONVERTED: NLP Secrets_ Discover Powerful and Proven - Carnegie, Napoleon.txt -> NLP Secrets_ Discover Powerful and Proven - Carnegie, Napoleon.md
+- CONVERTED: NLP_ Maximize Your Potential- Hypnosis, Mi - Price, Victoria.txt -> NLP_ Maximize Your Potential- Hypnosis, Mi - Price, Victoria.md
+- CONVERTED: NLP_ The Real Mind Control_ A book that wi - Rafael Gurkovsky.txt -> NLP_ The Real Mind Control_ A book that wi - Rafael Gurkovsky.md
+- CONVERTED: People Buy You_ The Real Secret to what Ma - Blount, Jeb.txt -> People Buy You_ The Real Secret to what Ma - Blount, Jeb.md
+- CONVERTED: Reframing Neuro-linguistic Programming and - Unknown.txt -> Reframing Neuro-linguistic Programming and - Unknown.md
+- CONVERTED: Richard Bandler_s Guide to Trance-Formatio - Richard Bandler(1).txt -> Richard Bandler_s Guide to Trance-Formatio - Richard Bandler(1).md
+- CONVERTED: Richard Bandler_s Guide to Trance-formatio - Richard Bandler.txt -> Richard Bandler_s Guide to Trance-formatio - Richard Bandler.md
+- CONVERTED: Sleight of Mouth_ The Magic of Conversatio - Robert Dilts.txt -> Sleight of Mouth_ The Magic of Conversatio - Robert Dilts.md
+- CONVERTED: The Airbnb Way_ 5 Leadership Lessons for I - Joseph Michelli.txt -> The Airbnb Way_ 5 Leadership Lessons for I - Joseph Michelli.md
+- CONVERTED: The Ultimate Introduction to NLP_ How to b - Richard Bandler.txt -> The Ultimate Introduction to NLP_ How to b - Richard Bandler.md
+- CONVERTED: Using Your Brain--for a Change (Richard Ba - Unknown.txt -> Using Your Brain--for a Change (Richard Ba - Unknown.md
+- CONVERTED: HYPNOTHERAPY Methods, Techniques  Philosophies (JACQUIN, FREDDY [JACQUIN, FREDDY]) (z-library.sk, 1lib.sk, z-lib.sk).epub -> HYPNOTHERAPY Methods, Techniques  Philosophies (JACQUIN, FREDDY [JACQUIN, FREDDY]) (z-library.sk, 1lib.sk, z-lib.sk).md
+- CONVERTED: MENTAL MAGIC HYPNOTIC VIRUS DEFRAG PROGRAM. Remove Mental Defragmentation  unwelcome Hypnotic Viral implants (James F. Coyle) (z-library.sk, 1lib.sk, z-lib.sk).epub -> MENTAL MAGIC HYPNOTIC VIRUS DEFRAG PROGRAM. Remove Mental Defragmentation  unwelcome Hypnotic Viral implants (James F. Coyle) (z-library.sk, 1lib.sk, z-lib.sk).md
+- CONVERTED: NLP - Tom Hoobyar.epub -> NLP - Tom Hoobyar.md
+- CONVERTED: NLP Secrets_ Discover Powerful and Proven - Carnegie, Napoleon.epub -> NLP Secrets_ Discover Powerful and Proven - Carnegie, Napoleon.md
+- CONVERTED: NLP_ Maximize Your Potential- Hypnosis, Mi - Price, Victoria.epub -> NLP_ Maximize Your Potential- Hypnosis, Mi - Price, Victoria.md
+- CONVERTED: NLP_ The Real Mind Control_ A book that wi - Rafael Gurkovsky.epub -> NLP_ The Real Mind Control_ A book that wi - Rafael Gurkovsky.md
+- CONVERTED: The Lazy Way to Enlightenment and Unlimited Happiness (FREDDY Jacquin) (z-library.sk, 1lib.sk, z-lib.sk).epub -> The Lazy Way to Enlightenment and Unlimited Happiness (FREDDY Jacquin) (z-library.sk, 1lib.sk, z-lib.sk).md
+- CONVERTED: Big Book of NLP Expanded (2010) - Shlomo Vaknin.pdf -> Big Book of NLP Expanded (2010) - Shlomo Vaknin.md
+- CONVERTED: Hypnosis and Hypnotherapy Basic to Advanced Techniques for the Professional (Calvin D. Banyan, Gerald F. Kein) (z-library.sk, 1lib.sk, z-lib.sk).pdf -> Hypnosis and Hypnotherapy Basic to Advanced Techniques for the Professional (Calvin D. Banyan, Gerald F. Kein) (z-library.sk, 1lib.sk, z-lib.sk).md
+- CONVERTED: Modeling With NLP (Robert Dilts) (Z-Librar - Unknown.pdf -> Modeling With NLP (Robert Dilts) (Z-Librar - Unknown.md
+- CONVERTED: My Voice Will Go with You The Teaching Tales of Milton H. Erickson (Sidney Rosen) (z-library.sk, 1lib.sk, z-lib.sk).pdf -> My Voice Will Go with You The Teaching Tales of Milton H. Erickson (Sidney Rosen) (z-library.sk, 1lib.sk, z-lib.sk).md
+- CONVERTED: NLP Workbook A Practical Guide to Achievin - Unknown.pdf -> NLP Workbook A Practical Guide to Achievin - Unknown.md
+- CONVERTED: The Ultimate Introduction to NLP_ How to b - Richard Bandler (1).mobi -> The Ultimate Introduction to NLP_ How to b - Richard Bandler (1).md
+  python-fallback via .html
+- CONVERTED: The Ultimate Introduction to NLP_ How to b - Richard Bandler.mobi -> The Ultimate Introduction to NLP_ How to b - Richard Bandler.md
+  python-fallback via .html
+- CONVERTED: Monsters and Magical Sticks Theres No Such Thing As Hypnosis (Steven Heller  Terry Lee Steele) (z-library.sk, 1lib.sk, z-lib.sk).azw3 -> Monsters and Magical Sticks Theres No Such Thing As Hypnosis (Steven Heller  Terry Lee Steele) (z-library.sk, 1lib.sk, z-lib.sk).md
+  python-fallback via .epub

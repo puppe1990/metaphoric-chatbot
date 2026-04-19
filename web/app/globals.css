@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f4f6f1;
+  --bg-deep: #dde6d7;
+  --ink: #171912;
+  --muted: #59614e;
+  --card: rgba(255, 255, 252, 0.86);
+  --card-border: rgba(23, 25, 18, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background:
+    linear-gradient(90deg, rgba(23, 25, 18, 0.05) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(23, 25, 18, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, #fbfcf8 0%, var(--bg) 56%, var(--bg-deep) 100%);
+  background-size: 28px 28px, 28px 28px, auto;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  color: var(--ink);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+::selection {
+  background: rgba(200, 77, 46, 0.18);
+}
+
+@layer components {
+  .mode-card {
+    @apply rounded-[1.75rem] border border-black/10 bg-white/70 p-7 shadow-glow backdrop-blur-sm;
+  }
+
+  .mode-card-accent-ember {
+    background:
+      linear-gradient(180deg, rgba(255, 245, 240, 0.95), rgba(255, 250, 247, 0.82)),
+      rgba(255, 255, 255, 0.7);
+  }
+
+  .mode-card-accent-moss {
+    background:
+      linear-gradient(180deg, rgba(244, 247, 239, 0.98), rgba(250, 252, 247, 0.82)),
+      rgba(255, 255, 255, 0.7);
+  }
+}

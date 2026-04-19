@@ -1,0 +1,16 @@
+node_modules/
+.next/
+dist/
+build/
+.venv/
+.venv-markitdown/
+__pycache__/
+*.pyc
+*.sqlite3
+*.db
+.env
+**/.env.local
+playwright-report/
+test-results/
+coverage/
+tmp_real_validation/

@@ -1,0 +1,31 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - paragraph [ref=e5]: Metaphoric Chatbot
+        - heading "Um chat guiado para receber metáforas ou aprender a construí-las." [level=1] [ref=e6]
+        - paragraph [ref=e7]: Escolha se você quer receber uma metáfora pronta ou aprender a construir uma. A experiência permanece apenas em texto, estruturada e calma.
+      - region "Choose a mode" [ref=e8]:
+        - link "Modo guiado Ir Receber uma metáfora Descreva um conflito e receba uma metáfora curta, concreta e refinável. Começar" [ref=e9] [cursor=pointer]:
+          - /url: /c/new?mode=receive
+          - generic [ref=e10]:
+            - paragraph [ref=e11]: Modo guiado
+            - generic [ref=e12]: Ir
+          - generic [ref=e13]:
+            - heading "Receber uma metáfora" [level=2] [ref=e14]
+            - paragraph [ref=e15]: Descreva um conflito e receba uma metáfora curta, concreta e refinável.
+          - generic [ref=e16]:
+            - generic [ref=e17]: Começar
+            - generic [ref=e18]: →
+        - link "Modo guiado Ir Construir minha metáfora Transforme abstração em imagem com crítica técnica e reescrita guiada. Começar" [ref=e19] [cursor=pointer]:
+          - /url: /c/new?mode=build
+          - generic [ref=e20]:
+            - paragraph [ref=e21]: Modo guiado
+            - generic [ref=e22]: Ir
+          - generic [ref=e23]:
+            - heading "Construir minha metáfora" [level=2] [ref=e24]
+            - paragraph [ref=e25]: Transforme abstração em imagem com crítica técnica e reescrita guiada.
+          - generic [ref=e26]:
+            - generic [ref=e27]: Começar
+            - generic [ref=e28]: →
+  - alert [ref=e29]

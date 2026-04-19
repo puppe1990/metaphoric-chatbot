@@ -1,0 +1,45 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e2]
+  - generic [ref=e5]: Esta sessão será lembrada neste navegador para facilitar a retomada mais tarde.
+  - main [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e9]:
+        - generic [ref=e10]:
+          - paragraph [ref=e11]: Receber uma metáfora
+          - heading "Um chat guiado para receber uma metáfora ou construir uma do zero." [level=1] [ref=e12]
+          - paragraph [ref=e13]: Você está descrevendo um problema para receber uma metáfora curta, clara e útil.
+        - generic [ref=e14]:
+          - generic [ref=e15]: Intake Problem
+          - paragraph [ref=e17]:
+            - generic [ref=e18]: "Modo atual:"
+            - text: receive
+          - paragraph [ref=e19]: Sessão lqAknW9bn2MI-ng9sBODkBNnlAm1Xc3o
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - list "Chat messages" [ref=e22]:
+            - listitem [ref=e23]:
+              - paragraph [ref=e24]: Assistente
+              - paragraph [ref=e25]: Descreva o problema em uma frase simples.
+          - generic [ref=e26]:
+            - generic [ref=e27]: Sua próxima linha
+            - generic [ref=e28]:
+              - textbox "Message input" [ref=e29]:
+                - /placeholder: "Ex.: o projeto trava quando precisa decidir..."
+              - generic [ref=e30]:
+                - button "O que está travando?" [ref=e31] [cursor=pointer]
+                - button "Onde a tensão aparece?" [ref=e32] [cursor=pointer]
+                - button "O que não está funcionando?" [ref=e33] [cursor=pointer]
+            - generic [ref=e34]:
+              - paragraph [ref=e35]: O envio será conectado na próxima etapa. Por enquanto, a experiência funciona como uma peça guiada.
+              - button "Enviar" [ref=e36] [cursor=pointer]
+        - complementary [ref=e37]:
+          - paragraph [ref=e38]: Painel de artefatos
+          - heading "Receita da metáfora" [level=2] [ref=e39]
+          - paragraph [ref=e40]: O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.
+          - generic [ref=e41]:
+            - paragraph [ref=e42]: Sessão
+            - paragraph [ref=e43]: lqAknW9bn2MI-ng9sBODkBNnlAm1Xc3o
+          - list [ref=e44]:
+            - listitem [ref=e45]: A conversa fica em texto puro para preservar a clareza do fluxo.
+            - listitem [ref=e46]: O painel lateral guarda o estado simbólico que será gerado pelo agente depois.
+            - listitem [ref=e47]: As sessões por token entram aqui quando o backend estiver ligado.

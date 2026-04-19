@@ -1,0 +1,29 @@
+[    5604ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/:0
+[    5883ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(pages-dir-browser)/./node_modules/react-dom/cjs/react-dom-client.development.js:24868
+[    5913ms] [LOG] [HMR] connected @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:41
+[    5964ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/favicon.ico:0
+[    9008ms] [WARNING] The resource http://localhost:3000/_next/static/css/app/layout.css?v=1776563384483 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ http://localhost:3000/:0
+[   52209ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:84
+[   53211ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:84
+[   54214ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:84
+[   55216ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:84
+[   56219ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:84
+[   61222ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:84
+[   66226ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:84
+[   71230ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:84
+[   76237ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:84
+[   81249ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:84
+[   86324ms] [LOG] [HMR] connected @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:41
+[   86360ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/hot-reloader-client.js:204
+[   87170ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/hot-reloader-client.js:204
+[   88294ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/_next/static/webpack/324065f779b29c0f.webpack.hot-update.json:0
+[   88472ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/hot-reloader-client.js:204
+[   88782ms] [WARNING] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree. @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/components/react-dev-overlay/pages/hot-reloader-client.js:336
+[   89016ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:25022

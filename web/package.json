@@ -1,0 +1,27 @@
+{
+  "name": "metaphoric-chatbot-web",
+  "private": true,
+  "scripts": {
+    "dev": "NODE_OPTIONS='--localstorage-file=.node-localstorage' next dev",
+    "build": "NODE_OPTIONS='--localstorage-file=.node-localstorage' next build",
+    "start": "NODE_OPTIONS='--localstorage-file=.node-localstorage' next start",
+    "test": "NODE_OPTIONS='--localstorage-file=.node-localstorage' vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "next": "15.3.7",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.3.0",
+    "@testing-library/jest-dom": "6.6.3",
+    "@types/node": "22.15.3",
+    "@types/react": "19.1.2",
+    "@types/react-dom": "19.1.2",
+    "autoprefixer": "10.4.21",
+    "jsdom": "26.1.0",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.8.3",
+    "vitest": "3.1.2"
+  }
+}
