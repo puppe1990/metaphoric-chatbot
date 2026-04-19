@@ -62,7 +62,11 @@ def test_get_session_returns_persisted_opening_message(tmp_path):
     ]
 
 
-def test_message_endpoint_persists_transcript_and_advances_state(tmp_path):
+def test_message_endpoint_persists_transcript_and_advances_state(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
+
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         started = client.post("/api/chat/start", json={"mode": "receive"})
         token = started.json()["token"]
@@ -110,7 +114,11 @@ def test_message_endpoint_persists_transcript_and_advances_state(tmp_path):
     assert restored.json()["artifacts"] == body["artifacts"]
 
 
-def test_message_endpoint_selects_receive_choice_and_enters_refinement(tmp_path):
+def test_message_endpoint_selects_receive_choice_and_enters_refinement(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
+
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         started = client.post("/api/chat/start", json={"mode": "receive"})
         token = started.json()["token"]
@@ -141,7 +149,11 @@ def test_message_endpoint_selects_receive_choice_and_enters_refinement(tmp_path)
     }
 
 
-def test_message_endpoint_promotes_user_image_to_active_metaphor_seed(tmp_path):
+def test_message_endpoint_promotes_user_image_to_active_metaphor_seed(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
+
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
         client.post("/api/chat/message", json={"token": token, "content": "estou bloqueado"})
@@ -158,7 +170,11 @@ def test_message_endpoint_promotes_user_image_to_active_metaphor_seed(tmp_path):
     assert restored_body["state"] == "refine_selected"
 
 
-def test_message_endpoint_refinement_request_in_present_choices_skips_literal_selection(tmp_path):
+def test_message_endpoint_refinement_request_in_present_choices_skips_literal_selection(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
+
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
         client.post("/api/chat/message", json={"token": token, "content": "estou bloqueado"})
@@ -173,7 +189,9 @@ def test_message_endpoint_refinement_request_in_present_choices_skips_literal_se
 
 
 def test_message_endpoint_contextual_receive_suggestions_match_problem_language(tmp_path, monkeypatch):
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
@@ -186,7 +204,9 @@ def test_message_endpoint_contextual_receive_suggestions_match_problem_language(
 
 
 def test_message_endpoint_refinement_request_keeps_active_metaphor_context(tmp_path, monkeypatch):
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
@@ -213,7 +233,9 @@ def test_message_endpoint_rejects_blank_content(tmp_path):
 
 
 def test_message_endpoint_uses_local_fallback_when_provider_is_not_configured(tmp_path, monkeypatch):
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.create_provider", lambda: LocalProvider())
 
     with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
         started = client.post("/api/chat/start", json={"mode": "receive"})

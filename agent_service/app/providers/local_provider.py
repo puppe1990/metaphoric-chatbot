@@ -124,6 +124,12 @@ class LocalProvider:
         symbol = self._extract_symbol(previous) or "essa imagem"
         latest_lower = latest.lower()
 
+        if self._is_refinement_request(latest_lower):
+            return (
+                f"Então o centro continua claro: {symbol}. "
+                "O que deixa essa imagem mais nítida agora: a direção falha, a neblina fecha, ou a costa some?"
+            )
+
         if any(verb in latest_lower for verb in ["falo", "digo", "solto", "faço"]):
             return (
                 f"Então a cena já ganhou movimento: {symbol} aparece e solta uma bobagem grande. "
@@ -251,6 +257,27 @@ class LocalProvider:
                 flags=re.IGNORECASE,
             )
         )
+
+    def _is_refinement_request(self, normalized: str) -> bool:
+        direct_markers = {
+            "mais curta",
+            "mais curto",
+            "mais concreta",
+            "mais concreto",
+            "mais direta",
+            "mais direto",
+            "mais poética",
+            "mais poetica",
+            "menos poética",
+            "menos poetica",
+            "reescreve",
+            "reescrever",
+            "ajusta",
+            "ajusta isso",
+        }
+        if normalized in direct_markers:
+            return True
+        return bool(re.match(r"^(reescreve|reescrever|ajusta)\b", normalized, flags=re.IGNORECASE))
 
     def _latest_user_line(self, user_prompt: str) -> str:
         user_lines = [
