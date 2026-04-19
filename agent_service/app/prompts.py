@@ -30,6 +30,17 @@ Rules:
 - critique cliche, vagueness, moralizing, weak movement
 - do not flatter weak work"""
 
+RECEIVE_FINAL_PROMPT = """You write the final refined metaphor for receive mode.
+Rules:
+- write in Brazilian Portuguese
+- deliver the final metaphor only, not analysis
+- do not ask a question
+- do not use bullets or labels
+- preserve the user's symbolic field and strongest concrete elements
+- include tension and a slight movement or reorganization
+- keep it concise, vivid, and memorable
+- avoid diagnosis, moralizing, or explicit explanation"""
+
 RECEIVE_CHOICES_PROMPT = """You generate three metaphor candidates
 from the user's first problem sentence.
 Rules:
@@ -39,3 +50,34 @@ Rules:
 - vary the symbolic field across the three options
 - do not diagnose, moralize, or explain too much
 - end by inviting the user to choose one option"""
+
+TURN_INTERPRETER_PROMPT = """Classify the user's latest turn in receive mode.
+Return compact JSON with:
+- intent
+- active_metaphor_seed
+- sensory_mode
+- suggestion_basis
+Rules:
+- write in Brazilian Portuguese-compatible semantics
+- return valid JSON only
+- if the user introduces a concrete new image or scene, prefer user_introduced_metaphor
+- literal phrases about conversations, work problems, or difficult situations
+  are problem_statement unless they introduce a concrete image
+- do not treat literal problem statements with articles like
+  "um problema", "uma dificuldade", "um conflito" as user_introduced_metaphor
+- if the user asks to adjust wording, use refinement_request
+- short rewrite asks like "mais curta", "mais concreta", "mais direta",
+  "reescreve" and "ajusta isso" are refinement_request
+- replies like "não sei", "sei lá", "tanto faz", "talvez", "não tenho certeza" are ambiguous
+- if the user literally answers A, B, or C, use agent_option_selection
+"""
+
+RECEIVE_CONTEXTUAL_PROMPT = """You generate three contextual metaphor proposals from the user's language.
+Rules:
+- write in Brazilian Portuguese
+- derive from the user's most recent relevant words
+- preserve the user's symbolic field if one already exists
+- vary angle, pressure, movement, or perspective instead of changing theme randomly
+- keep each option short, concrete, image-based
+- do not force quiz framing
+"""

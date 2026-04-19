@@ -94,8 +94,8 @@ export function ChatShell({
   }, [session.messages, session.artifacts]);
 
   return (
-    <section className="h-full min-h-0 px-3 pb-3 text-ink sm:px-5">
-      <div className="mx-auto grid h-full min-h-0 max-w-5xl grid-rows-[auto_1fr] overflow-hidden rounded-lg border border-ink/10 bg-white/82 shadow-[0_24px_80px_rgba(23,25,18,0.12)] backdrop-blur">
+    <section className="flex min-h-0 flex-1 px-3 pb-3 text-ink sm:px-5">
+      <div className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-ink/10 bg-white/82 shadow-[0_24px_80px_rgba(23,25,18,0.12)] backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink/10 bg-white/78 px-4 py-4 sm:px-6">
           <ProgressChip label={session.progressLabel} />
           <div className="flex flex-wrap items-center gap-2">
@@ -120,8 +120,8 @@ export function ChatShell({
           </div>
         </div>
 
-        <section className="grid min-h-0 grid-rows-[1fr_auto]">
-          <div className="min-h-0 overflow-y-auto px-4 py-5 sm:px-6" ref={transcriptRef}>
+        <section className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6" ref={transcriptRef}>
             <div className="mx-auto max-w-3xl">
               <MessageList
                 artifacts={session.artifacts}
@@ -131,7 +131,7 @@ export function ChatShell({
               />
             </div>
           </div>
-          <div className="mx-auto w-full max-w-3xl">
+          <div className="mx-auto mt-auto w-full max-w-3xl">
             <ChatInput
               disabled={inputDisabled}
               formRef={formRef}

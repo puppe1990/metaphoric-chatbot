@@ -1,3 +1,5 @@
+import sqlite3
+
 from app.db import SessionLocal, init_db
 from app.models import ArtifactRecord, SessionRecord
 from app.repository import SessionRepository
@@ -290,3 +292,172 @@ def test_update_latest_artifact_metadata_returns_none_when_no_match_exists(tmp_p
         session.close()
 
     assert updated is None
+
+
+def test_update_session_context_persists_active_metaphor_fields(tmp_path):
+    database_url = f"sqlite:///{tmp_path}/test.db"
+    init_db(database_url)
+    session = SessionLocal()
+    try:
+        repo = SessionRepository(session)
+        created = repo.create_session(mode="receive")
+
+        updated = repo.update_session_context(
+            session_id=created.id,
+            context={
+                "active_metaphor_seed": "um barco perdido no oceano",
+                "last_user_intent": "user_introduced_metaphor",
+                "sensory_mode": "visual",
+                "suggestion_basis": "derived-from-user-image",
+            },
+        )
+        session.commit()
+        session_id = created.id
+    finally:
+        session.close()
+
+    fresh = SessionLocal()
+    try:
+        persisted = fresh.query(SessionRecord).filter_by(id=session_id).one()
+    finally:
+        fresh.close()
+
+    assert updated.active_metaphor_seed == "um barco perdido no oceano"
+    assert persisted.last_user_intent == "user_introduced_metaphor"
+    assert persisted.sensory_mode == "visual"
+    assert persisted.suggestion_basis == "derived-from-user-image"
+
+
+def test_update_session_context_rejects_unknown_fields(tmp_path):
+    database_url = f"sqlite:///{tmp_path}/test.db"
+    init_db(database_url)
+    session = SessionLocal()
+    try:
+        repo = SessionRepository(session)
+        created = repo.create_session(mode="receive")
+
+        try:
+            repo.update_session_context(
+                session_id=created.id,
+                context={"sensorymode": "visual"},
+            )
+        except ValueError as exc:
+            assert "Unsupported session context fields" in str(exc)
+        else:
+            raise AssertionError("Expected update_session_context to reject unknown fields")
+    finally:
+        session.close()
+
+
+def test_update_session_context_rejects_invalid_value_types(tmp_path):
+    database_url = f"sqlite:///{tmp_path}/test.db"
+    init_db(database_url)
+    session = SessionLocal()
+    try:
+        repo = SessionRepository(session)
+        created = repo.create_session(mode="receive")
+
+        try:
+            repo.update_session_context(
+                session_id=created.id,
+                context={"active_metaphor_seed": {"foo": "bar"}},
+            )
+        except ValueError as exc:
+            assert "Invalid session context payload" in str(exc)
+        else:
+            raise AssertionError("Expected update_session_context to reject invalid value types")
+    finally:
+        session.close()
+
+
+def test_update_session_context_rejects_invalid_turn_intent(tmp_path):
+    database_url = f"sqlite:///{tmp_path}/test.db"
+    init_db(database_url)
+    session = SessionLocal()
+    try:
+        repo = SessionRepository(session)
+        created = repo.create_session(mode="receive")
+
+        try:
+            repo.update_session_context(
+                session_id=created.id,
+                context={"last_user_intent": "not-a-real-intent"},
+            )
+        except ValueError as exc:
+            assert "Invalid session context payload" in str(exc)
+        else:
+            raise AssertionError("Expected update_session_context to reject invalid turn intent")
+    finally:
+        session.close()
+
+
+def test_update_session_context_partial_updates_preserve_existing_fields(tmp_path):
+    database_url = f"sqlite:///{tmp_path}/test.db"
+    init_db(database_url)
+    session = SessionLocal()
+    try:
+        repo = SessionRepository(session)
+        created = repo.create_session(mode="receive")
+
+        repo.update_session_context(
+            session_id=created.id,
+            context={
+                "active_metaphor_seed": "um barco perdido no oceano",
+                "last_user_intent": "user_introduced_metaphor",
+                "sensory_mode": "visual",
+                "suggestion_basis": "derived-from-user-image",
+            },
+        )
+        session.commit()
+
+        updated = repo.update_session_context(
+            session_id=created.id,
+            context={"last_user_intent": "refinement_request"},
+        )
+        session.commit()
+        session_id = created.id
+    finally:
+        session.close()
+
+    fresh = SessionLocal()
+    try:
+        persisted = fresh.query(SessionRecord).filter_by(id=session_id).one()
+    finally:
+        fresh.close()
+
+    assert updated.last_user_intent == "refinement_request"
+    assert persisted.active_metaphor_seed == "um barco perdido no oceano"
+    assert persisted.last_user_intent == "refinement_request"
+    assert persisted.sensory_mode == "visual"
+    assert persisted.suggestion_basis == "derived-from-user-image"
+
+
+def test_init_db_backfills_receive_context_columns_for_existing_sqlite_sessions_table(tmp_path):
+    database_path = tmp_path / "legacy.db"
+    with sqlite3.connect(database_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE sessions (
+                id INTEGER PRIMARY KEY,
+                token VARCHAR(64) NOT NULL UNIQUE,
+                mode VARCHAR(32) NOT NULL,
+                state VARCHAR(64) NOT NULL,
+                title VARCHAR(255),
+                provider VARCHAR(32) NOT NULL,
+                model VARCHAR(128) NOT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL
+            )
+            """
+        )
+        connection.commit()
+
+    init_db(f"sqlite:///{database_path}")
+
+    with sqlite3.connect(database_path) as connection:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(sessions)")}
+
+    assert "active_metaphor_seed" in columns
+    assert "last_user_intent" in columns
+    assert "sensory_mode" in columns
+    assert "suggestion_basis" in columns

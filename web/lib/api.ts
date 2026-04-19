@@ -264,3 +264,22 @@ export async function sendMessage(token: string, content: string): Promise<SendM
     body: JSON.stringify({ token, content }),
   });
 }
+
+export type ProviderConfig = {
+  provider: string;
+  model: string;
+  groq_models: string[];
+  nvidia_models: string[];
+};
+
+export async function getProviderConfig(): Promise<ProviderConfig> {
+  return requestJson<ProviderConfig>("/api/config", { method: "GET" });
+}
+
+export async function setProviderConfig(provider: string, model: string): Promise<{ provider: string; model: string }> {
+  return requestJson("/api/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, model }),
+  });
+}

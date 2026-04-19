@@ -4,12 +4,20 @@ import secrets
 from collections.abc import Mapping
 
 from app.models import ArtifactRecord, SessionRecord
-from app.schemas import ArtifactMetadata
+from app.schemas import ArtifactMetadata, SessionContextUpdate
+from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
 DEFAULT_STATE_BY_MODE = {
     "receive": "intake_problem",
     "build": "intake_problem",
+}
+
+SESSION_CONTEXT_FIELDS = {
+    "active_metaphor_seed",
+    "last_user_intent",
+    "sensory_mode",
+    "suggestion_basis",
 }
 
 
@@ -87,6 +95,24 @@ class SessionRepository:
         metadata_updates = metadata.model_dump() if isinstance(metadata, ArtifactMetadata) else dict(metadata)
         updated_metadata = ArtifactMetadata.model_validate({**current_metadata, **metadata_updates}).model_dump()
         record.set_metadata(updated_metadata)
+        self.db.add(record)
+        self.db.flush()
+        self.db.refresh(record)
+        return record
+
+    def update_session_context(self, session_id: int, context: Mapping[str, object]) -> SessionRecord:
+        unknown_fields = sorted(set(context) - SESSION_CONTEXT_FIELDS)
+        if unknown_fields:
+            raise ValueError(f"Unsupported session context fields: {', '.join(unknown_fields)}")
+
+        try:
+            validated_context = SessionContextUpdate.model_validate(dict(context)).model_dump(exclude_unset=True)
+        except ValidationError as exc:
+            raise ValueError(f"Invalid session context payload: {exc}") from exc
+
+        record = self.db.query(SessionRecord).filter(SessionRecord.id == session_id).one()
+        for key, value in validated_context.items():
+            setattr(record, key, value)
         self.db.add(record)
         self.db.flush()
         self.db.refresh(record)

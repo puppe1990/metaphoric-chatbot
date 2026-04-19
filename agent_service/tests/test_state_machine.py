@@ -45,7 +45,7 @@ def test_next_state_rejects_unsupported_current_state_for_valid_mode():
         next_state("receive", "unknown_state")
 
 
-def test_receive_mode_uses_choice_based_flow():
+def test_receive_mode_allows_semantic_continuation_after_present_choices():
     assert "optional_clarifier" not in FLOW["receive"]
     assert next_state("receive", "intake_problem") == "generate_candidates"
     assert next_state("receive", "generate_candidates") == "present_choices"
