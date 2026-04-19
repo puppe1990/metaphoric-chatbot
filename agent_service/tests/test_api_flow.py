@@ -257,3 +257,25 @@ def test_build_fallback_coaching_responds_to_user_attempt_without_repeating_prom
     assert "macaco" in message
     assert "bobagem" in message
     assert artifacts == []
+
+
+def test_build_fallback_coaching_uses_user_image_without_invalidating_it():
+    state, message, artifacts = build_assistant_message(
+        mode="build",
+        state="rewrite_together",
+        user_input=(
+            "assistant: Se isso tivesse um conflito central, qual seria em poucas palavras?\n"
+            "user: uma força lutando internamente\n"
+            "assistant: Isso parece mais algo preso, algo sendo empurrado, ou algo perdido no caminho?\n"
+            "user: vento\n"
+        ),
+        provider_factory=lambda: __import__("app.providers.local_provider", fromlist=["LocalProvider"]).LocalProvider(),
+    )
+
+    assert state == "rewrite_together"
+    assert "vento" in message.lower()
+    assert "não é" not in message.lower()
+    assert message.startswith("Então")
+    assert not message.startswith("Use ")
+    assert message.count("?") <= 1
+    assert artifacts == []
