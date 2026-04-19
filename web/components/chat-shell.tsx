@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChatInput } from "./chat-input";
 import { MessageList } from "./message-list";
 import { ProgressChip } from "./progress-chip";
+import { downloadChatMarkdown } from "../lib/chat-markdown";
 import type { GuidedSessionView } from "../lib/api";
 
 type ChatShellProps = {
@@ -31,6 +32,7 @@ export function ChatShell({
 }: ChatShellProps) {
   const [draft, setDraft] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
+  const transcriptRef = useRef<HTMLDivElement>(null);
   const pendingChoiceSubmitRef = useRef<"A" | "B" | "C" | null>(null);
   const value = inputValue ?? draft;
 
@@ -83,9 +85,18 @@ export function ChatShell({
     formRef.current?.requestSubmit();
   }, [inputDisabled, value]);
 
+  useEffect(() => {
+    const transcript = transcriptRef.current;
+    if (!transcript) {
+      return;
+    }
+
+    transcript.scrollTop = transcript.scrollHeight;
+  }, [session.messages, session.artifacts]);
+
   return (
-    <main className="min-h-[100dvh] px-3 py-3 text-ink sm:px-5">
-      <div className="mx-auto grid min-h-[calc(100dvh-1.5rem)] max-w-5xl grid-rows-[auto_1fr] overflow-hidden rounded-lg border border-ink/10 bg-white/82 shadow-[0_24px_80px_rgba(23,25,18,0.12)] backdrop-blur">
+    <section className="h-full min-h-0 px-3 pb-3 text-ink sm:px-5">
+      <div className="mx-auto grid h-full min-h-0 max-w-5xl grid-rows-[auto_1fr] overflow-hidden rounded-lg border border-ink/10 bg-white/82 shadow-[0_24px_80px_rgba(23,25,18,0.12)] backdrop-blur">
         <header className="border-b border-ink/10 bg-white/78 px-4 py-4 sm:px-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
@@ -103,6 +114,14 @@ export function ChatShell({
               >
                 Voltar ao início
               </Link>
+              <button
+                className="rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-fog disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={inputDisabled}
+                onClick={() => downloadChatMarkdown(session)}
+                type="button"
+              >
+                Baixar .md
+              </button>
               <ProgressChip label={session.progressLabel} />
               {onRestart ? (
                 <button
@@ -124,7 +143,7 @@ export function ChatShell({
         </header>
 
         <section className="grid min-h-0 grid-rows-[1fr_auto]">
-          <div className="min-h-0 overflow-y-auto px-4 py-5 sm:px-6">
+          <div className="min-h-0 overflow-y-auto px-4 py-5 sm:px-6" ref={transcriptRef}>
             <div className="mx-auto max-w-3xl">
               <MessageList
                 artifacts={session.artifacts}
@@ -157,6 +176,6 @@ export function ChatShell({
           </div>
         </section>
       </div>
-    </main>
+    </section>
   );
 }

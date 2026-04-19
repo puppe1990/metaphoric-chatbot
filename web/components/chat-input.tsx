@@ -27,6 +27,19 @@ export function ChatInput({
     onValueChange?.(suggestion);
   };
 
+  const handleKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  };
+
   return (
     <form className="border-t border-ink/10 bg-fog/85 px-4 py-4 backdrop-blur sm:px-5" onSubmit={onSubmit} ref={formRef}>
       <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-clay">
@@ -38,6 +51,7 @@ export function ChatInput({
           className="min-h-[84px] w-full resize-none border-0 bg-transparent px-1 py-1 text-sm leading-6 text-ink outline-none placeholder:text-clay/70"
           disabled={disabled}
           onChange={onChange}
+          onKeyDown={handleKeyDown}
           placeholder={placeholder}
           value={value}
         />

@@ -75,4 +75,32 @@ describe("ChatSessionPageClient", () => {
     expect(await screen.findByRole("link", { name: "Voltar ao início" })).toHaveAttribute("href", "/");
     expect(await screen.findByRole("button", { name: "Tentar novamente" })).toBeInTheDocument();
   });
+
+  it("fills the controlled input when a suggestion is clicked", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            token: "build_token",
+            mode: "build",
+            state: "intake_problem",
+            messages: [{ role: "assistant", content: "Descreva o problema em uma frase simples." }],
+            artifacts: [],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    render(<ChatSessionPageClient requestedMode="build" token="build_token" />);
+
+    const suggestion = await screen.findByRole("button", {
+      name: "Quero chegar em alguém por quem sinto atração.",
+    });
+
+    fireEvent.click(suggestion);
+
+    expect(screen.getByLabelText("Message input")).toHaveValue("Quero chegar em alguém por quem sinto atração.");
+  });
 });

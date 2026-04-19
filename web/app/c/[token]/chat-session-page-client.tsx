@@ -165,8 +165,8 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
   }
 
   return (
-    <>
-      <div className="px-4 pt-4 sm:px-6 lg:px-8">
+    <main className="grid h-[100dvh] grid-rows-[auto_1fr] overflow-hidden pt-4">
+      <div className="min-h-0 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           {error ? (
             <div role="alert" className="mb-4 rounded-[1.6rem] border border-ember/30 bg-ember/10 px-4 py-3 text-sm text-ink">
@@ -176,15 +176,18 @@ export function ChatSessionPageClient({ requestedMode, token }: ChatSessionPageC
           <SessionRestoreBanner currentSession={{ mode: sessionView.mode, progressLabel: sessionView.progressLabel, token: sessionView.token }} />
         </div>
       </div>
-      <ChatShell
-        inputDisabled={isLoading || isSubmitting || isRestarting}
-        inputValue={draft}
-        onInputChange={(event) => setDraft(event.target.value)}
-        onInputSubmit={handleSubmit}
-        onRestart={handleRestart}
-        restartDisabled={isLoading || isSubmitting || isRestarting}
-        session={sessionView}
-      />
-    </>
+      <div className="min-h-0">
+        <ChatShell
+          inputDisabled={isLoading || isSubmitting || isRestarting}
+          inputValue={draft}
+          onInputChange={(event) => setDraft(event.target.value)}
+          onInputValueChange={setDraft}
+          onInputSubmit={handleSubmit}
+          onRestart={handleRestart}
+          restartDisabled={isLoading || isSubmitting || isRestarting}
+          session={sessionView}
+        />
+      </div>
+    </main>
   );
 }

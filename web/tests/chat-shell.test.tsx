@@ -321,4 +321,148 @@ describe("ChatShell", () => {
     expect(submissions).toEqual([]);
     expect(screen.getByLabelText("Message input")).toHaveValue("");
   });
+
+  it("submits the current message when Enter is pressed", async () => {
+    const submissions: string[] = [];
+    const session: GuidedSessionView = {
+      token: "tok_enter_submit",
+      mode: "build",
+      title: "Construir minha metáfora",
+      description: "Transforme abstração em imagem com crítica técnica e reescrita guiada.",
+      progressLabel: "intake_problem",
+      messages: [{ role: "assistant", content: "Descreva o problema em uma frase simples." }],
+      artifacts: [],
+      artifactTitle: "Mapa simbólico",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: [],
+    };
+
+    render(
+      <ChatShell
+        onInputSubmit={(event) => {
+          const input = event.currentTarget.querySelector("textarea");
+          submissions.push(input?.value ?? "");
+        }}
+        session={session}
+      />,
+    );
+
+    const input = screen.getByLabelText("Message input");
+    fireEvent.change(input, { target: { value: "Uma porta emperrada." } });
+    fireEvent.keyDown(input, { key: "Enter", code: "Enter", charCode: 13 });
+
+    await waitFor(() => expect(submissions).toEqual(["Uma porta emperrada."]));
+    expect(screen.getByLabelText("Message input")).toHaveValue("");
+  });
+
+  it("keeps a newline when Shift+Enter is pressed", () => {
+    const submissions: string[] = [];
+    const session: GuidedSessionView = {
+      token: "tok_shift_enter",
+      mode: "build",
+      title: "Construir minha metáfora",
+      description: "Transforme abstração em imagem com crítica técnica e reescrita guiada.",
+      progressLabel: "intake_problem",
+      messages: [{ role: "assistant", content: "Descreva o problema em uma frase simples." }],
+      artifacts: [],
+      artifactTitle: "Mapa simbólico",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: [],
+    };
+
+    render(
+      <ChatShell
+        onInputSubmit={() => {
+          submissions.push("submitted");
+        }}
+        session={session}
+      />,
+    );
+
+    const input = screen.getByLabelText("Message input");
+    fireEvent.change(input, { target: { value: "Primeira linha" } });
+    fireEvent.keyDown(input, { key: "Enter", code: "Enter", charCode: 13, shiftKey: true });
+    fireEvent.change(input, { target: { value: "Primeira linha\nSegunda linha" } });
+
+    expect(submissions).toEqual([]);
+    expect(screen.getByLabelText("Message input")).toHaveValue("Primeira linha\nSegunda linha");
+  });
+
+  it("downloads the current conversation as markdown", () => {
+    const session: GuidedSessionView = {
+      token: "tok_download",
+      mode: "receive",
+      title: "Receber uma metáfora",
+      description: "Você está descrevendo um problema para receber uma metáfora curta, clara e útil.",
+      progressLabel: "present_choices",
+      messages: [
+        { role: "system", content: "Mantenha a resposta curta." },
+        { role: "assistant", content: "Escolha a imagem que melhor descreve seu momento." },
+      ],
+      artifacts: [
+        {
+          artifact_type: RECEIVE_CHOICE_ARTIFACT_TYPE,
+          content: "Mensagem antiga que nao deve ser usada para pareamento.",
+          metadata: {
+            clarifier_asked: false,
+            internal_candidate_count: 3,
+            selected_option: null,
+          },
+          choices: [
+            { label: "A", text: "Uma ponte oscilando no vento." },
+            { label: "B", text: "Um motor girando sem engatar." },
+            { label: "C", text: "Uma porta pesada que quase cede." },
+          ],
+        },
+      ],
+      artifactTitle: "Receita da metáfora",
+      artifactBody: "O shell vai mostrar a forma, o contraste e o gesto da imagem quando o fluxo ganhar backend.",
+      suggestions: [],
+    };
+    const createObjectUrl = vi.fn(() => "blob:markdown");
+    const revokeObjectUrl = vi.fn();
+    const click = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+
+    vi.stubGlobal(
+      "URL",
+      Object.assign(URL, {
+        createObjectURL: createObjectUrl,
+        revokeObjectURL: revokeObjectUrl,
+      }),
+    );
+
+    const createElement = vi.spyOn(document, "createElement").mockImplementation(((tagName: string) => {
+      if (tagName === "a") {
+        const anchor = originalCreateElement("a");
+        anchor.click = click;
+        return anchor;
+      }
+
+      return originalCreateElement(tagName);
+    }) as typeof document.createElement);
+    const appendChild = vi.spyOn(document.body, "appendChild");
+    const removeChild = vi.spyOn(document.body, "removeChild");
+
+    render(<ChatShell session={session} />);
+    appendChild.mockClear();
+    removeChild.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Baixar .md" }));
+
+    expect(createObjectUrl).toHaveBeenCalledTimes(1);
+    expect(createObjectUrl.mock.calls[0]?.[0]).toBeInstanceOf(Blob);
+    expect(appendChild).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(removeChild).toHaveBeenCalledTimes(1);
+    expect(revokeObjectUrl).toHaveBeenCalledWith("blob:markdown");
+
+    const link = appendChild.mock.calls[0]?.[0] as HTMLAnchorElement;
+    expect(link.download).toBe("conversa-tok_download.md");
+    expect(link.href).toBe("blob:markdown");
+
+    createElement.mockRestore();
+    appendChild.mockRestore();
+    removeChild.mockRestore();
+  });
 });
