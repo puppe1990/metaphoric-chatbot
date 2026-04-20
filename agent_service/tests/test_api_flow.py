@@ -103,6 +103,44 @@ def test_build_contextual_user_input_includes_selected_symbolic_world_context():
     )
 
 
+def test_build_contextual_user_input_includes_persisted_active_metaphor_seed():
+    contextual_input = build_contextual_user_input(
+        messages=[],
+        content="Mais concreta.",
+        active_metaphor_seed="monstro",
+    )
+
+    assert "active_metaphor_seed: monstro" in contextual_input
+    assert contextual_input.rstrip().endswith("user: Mais concreta.")
+
+
+def test_build_contextual_user_input_includes_initial_problem_and_literal_block_story():
+    class Message:
+        def __init__(self, role: str, content: str) -> None:
+            self.role = role
+            self.content = content
+
+    contextual_input = build_contextual_user_input(
+        messages=[
+            Message("assistant", "Descreva o problema em uma frase simples."),
+            Message(
+                "user",
+                "estou sempre procurando a nova ferramenta e nunca faço o que deve ser feito pra ganhar dinheiro",
+            ),
+            Message("assistant", "Boa. Agora diga como você quer ajustar essa opção."),
+            Message("user", "nao tenho a ferramenta certa pra seguir"),
+        ],
+        content="uma espada",
+        active_metaphor_seed="uma espada",
+    )
+
+    assert (
+        "receive_initial_problem: estou sempre procurando a nova ferramenta "
+        "e nunca faço o que deve ser feito pra ganhar dinheiro" in contextual_input
+    )
+    assert "receive_literal_block_story: nao tenho a ferramenta certa pra seguir" in contextual_input
+
+
 def test_message_endpoint_persists_transcript_and_advances_state(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
@@ -156,6 +194,57 @@ def test_message_endpoint_persists_transcript_and_advances_state(tmp_path, monke
     assert restored.status_code == 200
     assert restored.json()["messages"] == body["messages"]
     assert restored.json()["artifacts"] == body["artifacts"]
+
+
+def test_message_endpoint_first_literal_problem_uses_contextual_symbolic_worlds(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+
+    with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
+        token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
+        response = client.post(
+            "/api/chat/message",
+            json={"token": token, "content": "Meu chefe muda tudo na última hora e eu me sinto esmagado."},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["state"] == "present_choices"
+    assert body["assistant_message"] == (
+        "Escolha o mundo que mais encaixa. Depois eu desenvolvo a metáfora por esse caminho."
+    )
+    assert body["artifacts"][0]["artifact_type"] == "receive_choice"
+    assert [choice["label"] for choice in body["artifacts"][0]["choices"]] == ["A", "B", "C", "D", "E"]
+    assert body["artifacts"][0]["choices"][0]["text"] == "Natureza: plantio, colheita, raiz, crescimento."
+
+
+def test_message_endpoint_first_imagetic_phrase_skips_world_selection_and_enters_refinement(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+    database_url = f"sqlite:///{tmp_path}/api-flow.db"
+
+    with TestClient(create_app(database_url=database_url)) as client:
+        token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
+        response = client.post(
+            "/api/chat/message",
+            json={"token": token, "content": "Sinto que estou carregando uma mochila de pedra todo dia."},
+        )
+
+    session = SessionLocal()
+    try:
+        persisted = session.query(SessionRecord).filter_by(token=token).one()
+    finally:
+        session.close()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["state"] == "refine_selected"
+    assert body["artifacts"] == []
+    assert "mochila de pedra" in body["assistant_message"].lower()
+    assert persisted.active_metaphor_seed == "Sinto que estou carregando uma mochila de pedra todo dia."
+    assert persisted.last_user_intent == "user_introduced_metaphor"
 
 
 def test_message_endpoint_selects_receive_choice_and_enters_refinement(tmp_path, monkeypatch):
@@ -216,6 +305,53 @@ def test_message_endpoint_promotes_user_image_to_active_metaphor_seed(tmp_path, 
 
     restored_body = restored.json()
     assert restored_body["state"] == "present_choices"
+
+
+def test_message_endpoint_promotes_single_word_image_to_active_metaphor_seed(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+    database_url = f"sqlite:///{tmp_path}/api-flow.db"
+
+    with TestClient(create_app(database_url=database_url)) as client:
+        token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
+        client.post(
+            "/api/chat/message",
+            json={"token": token, "content": "eu tenho um monstro interno que está indomável"},
+        )
+        client.post("/api/chat/message", json={"token": token, "content": "B"})
+        client.post("/api/chat/message", json={"token": token, "content": "mais concreta"})
+        response = client.post("/api/chat/message", json={"token": token, "content": "monstro"})
+
+    session = SessionLocal()
+    try:
+        persisted = session.query(SessionRecord).filter_by(token=token).one()
+    finally:
+        session.close()
+
+    assert response.status_code == 200
+    assert persisted.active_metaphor_seed == "monstro"
+    assert persisted.last_user_intent == "user_introduced_metaphor"
+
+
+def test_message_endpoint_option_letter_after_direct_refine_path_stays_recoverable(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+
+    with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
+        token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
+        first_turn = client.post(
+            "/api/chat/message",
+            json={"token": token, "content": "Sinto que estou carregando uma mochila de pedra todo dia."},
+        )
+        response = client.post("/api/chat/message", json={"token": token, "content": "B"})
+
+    assert first_turn.status_code == 200
+    assert first_turn.json()["state"] == "refine_selected"
+    assert response.status_code == 200
+    assert response.json()["state"] == "refine_selected"
+    assert response.json()["messages"][-1]["role"] == "assistant"
 
 
 def test_message_endpoint_refinement_request_in_present_choices_skips_literal_selection(tmp_path, monkeypatch):
@@ -692,6 +828,36 @@ def test_build_assistant_message_keeps_exploring_before_three_llm_questions():
     assert interpretation is not None
 
 
+def test_build_assistant_message_does_not_finalize_receive_with_literal_block_story():
+    state, message, artifacts, interpretation = build_assistant_message(
+        mode="receive",
+        state="refine_selected",
+        user_input=(
+            "assistant: Descreva o problema em uma frase simples.\n"
+            "user: estou sempre procurando a nova ferramenta e nunca faco o que deve ser feito pra ganhar dinheiro\n"
+            "assistant: Em qual desses mundos isso se encaixa?\n"
+            "user: C\n"
+            "assistant: Boa. Agora diga como voce quer ajustar essa opcao.\n"
+            "user: mais concreta\n"
+            "assistant: Entao, na jornada que voce escolheu, "
+            "que elemento concreto poderia simbolizar a decisao em suspenso?\n"
+            "user: eu sempre escolho novas jornadas mas nunca sigo a que realmente importa\n"
+            "assistant: Entao a cena pode estar mentindo sobre a ferramenta.\n"
+            "user: nao tenho confianca pra seguir\n"
+            "assistant: Entao a cena pode estar mentindo sobre a ferramenta.\n"
+            "user: nao tenho a ferramenta certa pra seguir\n"
+        ),
+        provider_factory=lambda: __import__("app.providers.local_provider", fromlist=["LocalProvider"]).LocalProvider(),
+        receive_llm_question_count=3,
+    )
+
+    assert state == "refine_selected"
+    assert message != "Aqui estão duas leituras finais do mesmo núcleo metafórico."
+    assert "?" in message
+    assert artifacts == []
+    assert interpretation is not None
+
+
 def test_build_assistant_message_uses_more_imagetic_machine_question_for_stuck_gear():
     state, message, artifacts, interpretation = build_assistant_message(
         mode="receive",
@@ -769,6 +935,37 @@ def test_build_assistant_message_asks_for_tactic_not_spectacle_in_war_field():
     assert interpretation is not None
 
 
+def test_build_assistant_message_in_journey_field_does_not_validate_missing_perfect_tool():
+    state, message, artifacts, interpretation = build_assistant_message(
+        mode="receive",
+        state="refine_selected",
+        user_input=(
+            "assistant: Descreva o problema em uma frase simples.\n"
+            "user: estou sempre procurando a nova ferramenta e nunca faco o que deve ser feito pra ganhar dinheiro\n"
+            "assistant: Em qual desses mundos isso se encaixa?\n"
+            "user: C\n"
+            "assistant: Boa. Agora diga como voce quer ajustar essa opcao.\n"
+            "user: mais concreta\n"
+            "assistant: Boa. Para seguir por jornada / viagem, me de uma imagem concreta.\n"
+            "user: eu sempre escolho novas jornadas mas nunca sigo a que realmente importa\n"
+            "assistant: Entao, quando tenta seguir a jornada que realmente importa, "
+            "que sinal ou marco concreto aparece a sua frente?\n"
+            "user: nao tenho confianca pra seguir\n"
+            "assistant: Entao, ao pensar em confianca para seguir essa jornada, "
+            "que objeto ou detalhe concreto aparece diante de voce?\n"
+            "user: nao tenho a ferramenta certa pra seguir\n"
+        ),
+        provider_factory=lambda: __import__("app.providers.local_provider", fromlist=["LocalProvider"]).LocalProvider(),
+    )
+
+    assert state == "refine_selected"
+    lowered = message.lower()
+    assert "ferramenta ideal" not in lowered
+    assert "outra trilha" in lowered or "novo mapa" in lowered or "desvio" in lowered
+    assert artifacts == []
+    assert interpretation is not None
+
+
 def test_local_provider_receive_final_response_preserves_user_war_scene_instead_of_generic_machine():
     from app.prompts import RECEIVE_FINAL_BANDLER_PROMPT, RECEIVE_FINAL_ERICKSON_PROMPT
     from app.providers.local_provider import LocalProvider
@@ -798,6 +995,38 @@ def test_local_provider_receive_final_response_preserves_user_war_scene_instead_
     assert "muralha" in bandler
     assert "catapulta" in bandler
     assert "máquina" not in bandler
+
+
+def test_local_provider_receive_final_response_prefers_active_image_seed_over_literal_block_story():
+    from app.prompts import RECEIVE_FINAL_BANDLER_PROMPT, RECEIVE_FINAL_ERICKSON_PROMPT
+    from app.providers.local_provider import LocalProvider
+
+    provider = LocalProvider()
+    transcript = (
+        "receive_initial_problem: estou sempre procurando a nova ferramenta "
+        "e nunca faço o que deve ser feito pra ganhar dinheiro\n"
+        "selected_symbolic_world_name: Jornada / viagem\n"
+        "active_metaphor_seed: uma espada\n"
+        "receive_literal_block_story: nao tenho a ferramenta certa pra seguir\n"
+        "assistant: Descreva o problema em uma frase simples.\n"
+        "user: estou sempre procurando a nova ferramenta e nunca faço o que deve ser feito pra ganhar dinheiro\n"
+        "assistant: Em qual desses mundos isso se encaixa?\n"
+        "user: C\n"
+        "assistant: Boa. Agora diga como voce quer ajustar essa opcao.\n"
+        "user: mais concreta\n"
+        "assistant: Entao a cena pode estar mentindo sobre a ferramenta.\n"
+        "user: nao tenho a ferramenta certa pra seguir\n"
+        "assistant: Entao a cena pode estar mentindo sobre a ferramenta.\n"
+        "user: uma espada\n"
+    )
+
+    erickson = provider.invoke_chat(RECEIVE_FINAL_ERICKSON_PROMPT, transcript).lower()
+    bandler = provider.invoke_chat(RECEIVE_FINAL_BANDLER_PROMPT, transcript).lower()
+
+    assert "uma espada" in erickson
+    assert "uma espada" in bandler
+    assert "nao tenho a ferramenta certa pra seguir toma a cena inteira" not in erickson
+    assert "nao tenho a ferramenta certa pra seguir aperta a cena" not in bandler
 
 
 def test_message_endpoint_receive_mode_final_keeps_user_mechanism_and_avoids_epic_cliches(tmp_path, monkeypatch):
@@ -855,6 +1084,14 @@ def test_coach_prompt_pushes_war_field_toward_tactic_instead_of_symbol_explanati
     assert "ask what it blocks" not in lowered
 
 
+def test_coach_prompt_warns_against_validating_tool_seeking_as_missing_tool():
+    from app.prompts import COACH_PROMPT
+
+    lowered = COACH_PROMPT.lower()
+    assert "tool-seeking loop" in lowered
+    assert "missing perfect tool" in lowered
+
+
 def test_receive_final_prompts_forbid_ornamental_cliche_language_seen_in_browser():
     from app.prompts import RECEIVE_FINAL_BANDLER_PROMPT, RECEIVE_FINAL_ERICKSON_PROMPT
 
@@ -903,6 +1140,34 @@ def test_interpret_turn_marks_user_metaphor_when_user_supplies_new_image():
 
     assert result.intent == "user_introduced_metaphor"
     assert result.active_metaphor_seed == "um barco perdido no oceano"
+
+
+def test_interpret_turn_marks_single_imagetic_noun_as_user_metaphor():
+    from app.agents import interpret_turn
+    from app.providers.local_provider import LocalProvider
+
+    result = interpret_turn(
+        LocalProvider(),
+        current_state="refine_selected",
+        user_input=("assistant: Boa. Para seguir por guerra / estratégia, me dê uma cena concreta.\nuser: monstro"),
+    )
+
+    assert result.intent == "user_introduced_metaphor"
+    assert result.active_metaphor_seed == "monstro"
+
+
+def test_interpret_turn_does_not_treat_short_literal_phrase_with_no_as_metaphor():
+    from app.agents import interpret_turn
+    from app.providers.local_provider import LocalProvider
+
+    result = interpret_turn(
+        LocalProvider(),
+        current_state="refine_selected",
+        user_input=("assistant: Boa. Para seguir por jornada / viagem, me dê uma cena concreta.\nuser: no trabalho"),
+    )
+
+    assert result.intent == "problem_statement"
+    assert result.active_metaphor_seed is None
 
 
 def test_interpret_turn_uses_turn_interpreter_prompt_and_provider_response():

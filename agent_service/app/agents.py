@@ -213,6 +213,10 @@ def hydrate_receive_final_comparison_artifact(content: str) -> ArtifactView:
     )
 
 
+def looks_like_user_metaphor(text: str) -> bool:
+    return _looks_like_user_metaphor(text.lower())
+
+
 def _parse_receive_choices(raw_output: str) -> list[MetaphorChoice] | None:
     matches = list(CHOICE_PATTERN.finditer(raw_output.strip()))
     if not matches:
@@ -377,10 +381,15 @@ def should_finalize_receive_response(
         return False
 
     latest = substantive_lines[-1].strip()
-    if len(latest.split()) >= 4:
+    if _looks_like_user_metaphor(latest.lower()):
         return True
 
-    return _looks_like_user_metaphor(latest.lower())
+    active_seed = _context_value(user_input, "active_metaphor_seed")
+    if not active_seed or not _looks_like_user_metaphor(active_seed.lower()):
+        return False
+
+    prior_imagetic_lines = [line for line in substantive_lines[:-1] if _looks_like_user_metaphor(line.lower())]
+    return len(prior_imagetic_lines) >= 1
 
 
 def _is_ambiguous_reply(normalized: str) -> bool:
@@ -439,7 +448,11 @@ def _collect_substantive_user_lines(user_input: str) -> list[str]:
 
 
 def _selected_symbolic_world_name(user_input: str) -> str | None:
-    match = re.search(r"selected_symbolic_world_name:\s*(.+)", user_input, flags=re.IGNORECASE)
+    return _context_value(user_input, "selected_symbolic_world_name")
+
+
+def _context_value(user_input: str, field_name: str) -> str | None:
+    match = re.search(rf"^{re.escape(field_name)}:\s*(.+)$", user_input, flags=re.IGNORECASE | re.MULTILINE)
     if match:
         return match.group(1).strip()
     return None
@@ -462,6 +475,23 @@ def _looks_like_user_metaphor(normalized: str) -> bool:
         "gaveta",
         "motor",
         "corredor",
+        "mochila",
+        "pedra",
+        "peito",
+        "nó",
+        "monstro",
+        "muralha",
+        "fortaleza",
+        "catapulta",
+        "trincheira",
+        "raiz",
+        "semente",
+        "ponte",
+        "mapa",
+        "engrenagem",
+        "alavanca",
+        "válvula",
+        "valvula",
     )
 
     literal_problem_markers = (
@@ -489,6 +519,12 @@ def _looks_like_user_metaphor(normalized: str) -> bool:
     article_led = re.match(r"^(?:(?:como|parece|soa como|vira|e como)\s+)?(um|uma)\b", normalized, flags=re.IGNORECASE)
     if article_led:
         return True
+
+    compact = normalized.strip().strip(".!?")
+    if compact and len(compact.split()) <= 3:
+        return any(
+            re.search(rf"\b{re.escape(marker)}\b", compact, flags=re.IGNORECASE) for marker in concrete_image_markers
+        )
 
     return any(
         re.search(rf"\b{re.escape(marker)}\b", normalized, flags=re.IGNORECASE) for marker in concrete_image_markers
