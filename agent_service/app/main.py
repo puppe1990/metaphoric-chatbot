@@ -582,16 +582,11 @@ def create_app(database_url: str | None = None) -> FastAPI:
                 and interpretation.intent == "agent_option_selection"
                 and content in RECEIVE_SELECTIONS
             ):
-                updated_artifact = repo.update_latest_artifact_metadata(
+                repo.update_latest_artifact_metadata(
                     session_id=session.id,
                     artifact_type="receive_choice",
                     metadata={"selected_option": content},
                 )
-                if updated_artifact is None:
-                    raise HTTPException(
-                        status_code=409,
-                        detail="No receive choice artifact found for selection.",
-                    )
         db.add(
             MessageRecord(
                 session_id=session.id,

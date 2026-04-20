@@ -334,6 +334,26 @@ def test_message_endpoint_promotes_single_word_image_to_active_metaphor_seed(tmp
     assert persisted.last_user_intent == "user_introduced_metaphor"
 
 
+def test_message_endpoint_option_letter_after_direct_refine_path_stays_recoverable(tmp_path, monkeypatch):
+    from app.providers.local_provider import LocalProvider
+
+    monkeypatch.setattr("app.main.resolve_provider", lambda _db: LocalProvider())
+
+    with TestClient(create_app(database_url=f"sqlite:///{tmp_path}/api-flow.db")) as client:
+        token = client.post("/api/chat/start", json={"mode": "receive"}).json()["token"]
+        first_turn = client.post(
+            "/api/chat/message",
+            json={"token": token, "content": "Sinto que estou carregando uma mochila de pedra todo dia."},
+        )
+        response = client.post("/api/chat/message", json={"token": token, "content": "B"})
+
+    assert first_turn.status_code == 200
+    assert first_turn.json()["state"] == "refine_selected"
+    assert response.status_code == 200
+    assert response.json()["state"] == "refine_selected"
+    assert response.json()["messages"][-1]["role"] == "assistant"
+
+
 def test_message_endpoint_refinement_request_in_present_choices_skips_literal_selection(tmp_path, monkeypatch):
     from app.providers.local_provider import LocalProvider
 
@@ -1134,6 +1154,20 @@ def test_interpret_turn_marks_single_imagetic_noun_as_user_metaphor():
 
     assert result.intent == "user_introduced_metaphor"
     assert result.active_metaphor_seed == "monstro"
+
+
+def test_interpret_turn_does_not_treat_short_literal_phrase_with_no_as_metaphor():
+    from app.agents import interpret_turn
+    from app.providers.local_provider import LocalProvider
+
+    result = interpret_turn(
+        LocalProvider(),
+        current_state="refine_selected",
+        user_input=("assistant: Boa. Para seguir por jornada / viagem, me dê uma cena concreta.\nuser: no trabalho"),
+    )
+
+    assert result.intent == "problem_statement"
+    assert result.active_metaphor_seed is None
 
 
 def test_interpret_turn_uses_turn_interpreter_prompt_and_provider_response():

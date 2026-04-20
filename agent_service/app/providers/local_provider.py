@@ -343,7 +343,6 @@ class LocalProvider:
             "pedra",
             "peito",
             "nó",
-            "no",
             "monstro",
             "muralha",
             "fortaleza",

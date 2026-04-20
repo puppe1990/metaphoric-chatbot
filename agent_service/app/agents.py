@@ -381,7 +381,15 @@ def should_finalize_receive_response(
         return False
 
     latest = substantive_lines[-1].strip()
-    return _looks_like_user_metaphor(latest.lower())
+    if _looks_like_user_metaphor(latest.lower()):
+        return True
+
+    active_seed = _context_value(user_input, "active_metaphor_seed")
+    if not active_seed or not _looks_like_user_metaphor(active_seed.lower()):
+        return False
+
+    prior_imagetic_lines = [line for line in substantive_lines[:-1] if _looks_like_user_metaphor(line.lower())]
+    return len(prior_imagetic_lines) >= 1
 
 
 def _is_ambiguous_reply(normalized: str) -> bool:
@@ -440,7 +448,11 @@ def _collect_substantive_user_lines(user_input: str) -> list[str]:
 
 
 def _selected_symbolic_world_name(user_input: str) -> str | None:
-    match = re.search(r"selected_symbolic_world_name:\s*(.+)", user_input, flags=re.IGNORECASE)
+    return _context_value(user_input, "selected_symbolic_world_name")
+
+
+def _context_value(user_input: str, field_name: str) -> str | None:
+    match = re.search(rf"^{re.escape(field_name)}:\s*(.+)$", user_input, flags=re.IGNORECASE | re.MULTILINE)
     if match:
         return match.group(1).strip()
     return None
@@ -467,7 +479,6 @@ def _looks_like_user_metaphor(normalized: str) -> bool:
         "pedra",
         "peito",
         "nó",
-        "no",
         "monstro",
         "muralha",
         "fortaleza",
