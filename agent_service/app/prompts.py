@@ -34,6 +34,8 @@ Rules:
 - prefer tactical mechanism over symbolic interpretation in war / strategy scenes
 - when the symbolic world is machine / engineering, keep the language imagetic and embodied,
   not like a classroom explanation
+- when the user's transcript suggests a tool-seeking loop, do not validate the story as a missing perfect tool;
+  redirect toward drift, switching maps, abandoning the main trail, or chasing a new route
 - avoid stacked explanations and avoid multiple questions in the same turn
 - critique cliche, vagueness, moralizing, weak movement
 - do not flatter weak work"""
@@ -65,6 +67,9 @@ Rules:
 - include tension and a slight movement or reorganization
 - keep it concise, vivid, and memorable
 - avoid fantasy-epic filler, ornamental weather, and stock lines like thunder, destiny, horizon, or sudden light
+- if the context provides `active_metaphor_seed`, prefer it over a later literal block story as the main image
+- if the context provides `receive_literal_block_story`, treat it as background pressure to transform,
+  not as the primary anchor of the final scene
 - avoid diagnosis, moralizing, or explicit explanation"""
 
 RECEIVE_FINAL_BANDLER_PROMPT = """You write the final refined metaphor for receive mode
@@ -94,6 +99,9 @@ Rules:
 - include tension and a slight movement or reorganization
 - keep it concise, vivid, and memorable
 - avoid fantasy-epic filler, ornamental weather, and stock lines like thunder, destiny, horizon, or sudden light
+- if the context provides `active_metaphor_seed`, prefer it over a later literal block story as the main image
+- if the context provides `receive_literal_block_story`, treat it as background pressure to transform,
+  not as the primary anchor of the final scene
 - avoid diagnosis, moralizing, or explicit explanation"""
 
 RECEIVE_CHOICES_PROMPT = """You generate three metaphor candidates

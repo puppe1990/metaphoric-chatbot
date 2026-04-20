@@ -10,6 +10,7 @@ from threading import Lock
 from app.agents import (
     hydrate_receive_choice_artifact,
     hydrate_receive_final_comparison_artifact,
+    looks_like_user_metaphor,
 )
 from app.config import get_allowed_origins, load_environment_file
 from app.db import SessionLocal, init_db
@@ -376,6 +377,34 @@ def _get_selected_symbolic_world_context(artifacts: list[ArtifactRecord]) -> str
     return "\n".join(context_lines)
 
 
+def _extract_user_lines_from_messages(messages: list[MessageRecord]) -> list[str]:
+    return [message.content.strip() for message in messages if message.role == "user" and message.content.strip()]
+
+
+def _build_receive_semantic_context(
+    messages: list[MessageRecord],
+    *,
+    active_metaphor_seed: str | None = None,
+) -> str:
+    user_lines = _extract_user_lines_from_messages(messages)
+    context_lines: list[str] = []
+
+    if user_lines:
+        context_lines.append(f"receive_initial_problem: {user_lines[0]}")
+
+    if active_metaphor_seed and active_metaphor_seed.strip():
+        active_seed = active_metaphor_seed.strip()
+        context_lines.append(f"active_metaphor_seed: {active_seed}")
+        latest_literal_block_story = next(
+            (line for line in reversed(user_lines) if line != active_seed and not looks_like_user_metaphor(line)),
+            None,
+        )
+        if latest_literal_block_story:
+            context_lines.append(f"receive_literal_block_story: {latest_literal_block_story}")
+
+    return "\n".join(context_lines)
+
+
 def build_contextual_user_input(
     messages: list[MessageRecord],
     content: str,
@@ -386,12 +415,11 @@ def build_contextual_user_input(
         f"{message.role}: {message.content}" for message in messages if message.role in {"assistant", "user"}
     )
     symbolic_world_context = _get_selected_symbolic_world_context(artifacts or [])
-    active_seed_context = (
-        f"active_metaphor_seed: {active_metaphor_seed.strip()}"
-        if active_metaphor_seed and active_metaphor_seed.strip()
-        else ""
+    receive_semantic_context = _build_receive_semantic_context(
+        messages,
+        active_metaphor_seed=active_metaphor_seed,
     )
-    context_lines = [line for line in (symbolic_world_context, active_seed_context) if line]
+    context_lines = [line for line in (symbolic_world_context, receive_semantic_context) if line]
     context_prefix = "\n".join(context_lines)
 
     if not transcript:

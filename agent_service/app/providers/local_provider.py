@@ -153,6 +153,12 @@ class LocalProvider:
             )
 
         if latest:
+            if selected_world == "jornada" and self._journey_tool_seeking_loop(user_lines):
+                return (
+                    "Então a cena pode estar mentindo sobre a ferramenta. "
+                    "O que te tira da trilha principal nessa jornada: "
+                    "um novo mapa, outra trilha ou o impulso de desviar de novo?"
+                )
             if selected_world == "guerra" and self._war_blockage_needs_tactic(latest_lower):
                 return (
                     "Então a muralha já mostrou o problema com nitidez. "
@@ -209,6 +215,8 @@ class LocalProvider:
         )
 
     def _receive_final_response(self, user_prompt: str, style: str) -> str:
+        context_active_seed = self._context_value(user_prompt, "active_metaphor_seed")
+        context_literal_block = self._context_value(user_prompt, "receive_literal_block_story")
         user_lines = [
             line.split(":", 1)[1].strip()
             for line in user_prompt.splitlines()
@@ -232,8 +240,21 @@ class LocalProvider:
                 "sei la",
             }
         ]
-        seed = substantive_lines[-1] if substantive_lines else "essa imagem"
-        anchor = substantive_lines[-2] if len(substantive_lines) > 1 else "o conflito antigo"
+        imagetic_lines = [line for line in substantive_lines if self._looks_like_user_metaphor(line)]
+
+        seed = context_active_seed or (
+            imagetic_lines[-1] if imagetic_lines else substantive_lines[-1] if substantive_lines else "essa imagem"
+        )
+
+        anchor_candidates = [line for line in imagetic_lines if line != seed]
+        if anchor_candidates:
+            anchor = anchor_candidates[-1]
+        elif context_literal_block and context_active_seed:
+            anchor = context_active_seed
+        elif len(substantive_lines) > 1:
+            anchor = substantive_lines[-2]
+        else:
+            anchor = "o conflito antigo"
         selected_world = self._selected_symbolic_world(user_lines)
 
         if selected_world == "guerra" or self._contains_war_imagery(seed, anchor):
@@ -292,6 +313,13 @@ class LocalProvider:
         if not match:
             return None
         return f"{match.group(1).lower()} {match.group(2).strip()}"
+
+    def _context_value(self, text: str, field_name: str) -> str | None:
+        match = re.search(rf"^{re.escape(field_name)}:\s*(.+)$", text, flags=re.IGNORECASE | re.MULTILINE)
+        if not match:
+            return None
+        value = match.group(1).strip()
+        return value or None
 
     def _looks_like_user_metaphor(self, text: str) -> bool:
         normalized = text.strip().lower()
@@ -378,6 +406,31 @@ class LocalProvider:
                 flags=re.IGNORECASE,
             )
         )
+
+    def _journey_tool_seeking_loop(self, user_lines: list[str]) -> bool:
+        transcript = " ".join(user_lines).lower()
+        has_tool_chasing = bool(
+            re.search(
+                r"\b(nova ferramenta|novas ferramentas|ferramenta certa|ferramenta ideal|ferramenta)\b",
+                transcript,
+                flags=re.IGNORECASE,
+            )
+        )
+        has_journey_drift = bool(
+            re.search(
+                r"\b(jornada|jornadas|trilha|trilhas|mapa|mapas|desvio|seguir|caminho|rota)\b",
+                transcript,
+                flags=re.IGNORECASE,
+            )
+        )
+        has_main_task_loss = bool(
+            re.search(
+                r"\b(nunca faço|nunca faco|ganhar dinheiro|realmente importa|importa)\b",
+                transcript,
+                flags=re.IGNORECASE,
+            )
+        )
+        return has_tool_chasing and has_journey_drift and has_main_task_loss
 
     def _contains_war_imagery(self, *values: str) -> bool:
         return any(

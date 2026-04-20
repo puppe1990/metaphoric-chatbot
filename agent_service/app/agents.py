@@ -213,6 +213,10 @@ def hydrate_receive_final_comparison_artifact(content: str) -> ArtifactView:
     )
 
 
+def looks_like_user_metaphor(text: str) -> bool:
+    return _looks_like_user_metaphor(text.lower())
+
+
 def _parse_receive_choices(raw_output: str) -> list[MetaphorChoice] | None:
     matches = list(CHOICE_PATTERN.finditer(raw_output.strip()))
     if not matches:
@@ -377,9 +381,6 @@ def should_finalize_receive_response(
         return False
 
     latest = substantive_lines[-1].strip()
-    if len(latest.split()) >= 4:
-        return True
-
     return _looks_like_user_metaphor(latest.lower())
 
 
