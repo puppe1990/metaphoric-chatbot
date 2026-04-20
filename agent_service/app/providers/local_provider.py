@@ -311,6 +311,24 @@ class LocalProvider:
             "gaveta",
             "motor",
             "corredor",
+            "mochila",
+            "pedra",
+            "peito",
+            "nó",
+            "no",
+            "monstro",
+            "muralha",
+            "fortaleza",
+            "catapulta",
+            "trincheira",
+            "raiz",
+            "semente",
+            "ponte",
+            "mapa",
+            "engrenagem",
+            "alavanca",
+            "válvula",
+            "valvula",
         )
 
         literal_problem_markers = (
@@ -337,6 +355,13 @@ class LocalProvider:
 
         if re.match(r"^(?:(?:como|parece|soa como|vira|e como)\s+)?(um|uma)\b", normalized, flags=re.IGNORECASE):
             return True
+
+        compact = normalized.strip().strip(".!?")
+        if compact and len(compact.split()) <= 3:
+            return any(
+                re.search(rf"\b{re.escape(marker)}\b", compact, flags=re.IGNORECASE)
+                for marker in concrete_image_markers
+            )
 
         return any(
             re.search(rf"\b{re.escape(marker)}\b", normalized, flags=re.IGNORECASE) for marker in concrete_image_markers

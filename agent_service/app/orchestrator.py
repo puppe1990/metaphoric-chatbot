@@ -7,6 +7,7 @@ from app.agents import (
     build_pending_receive_final_comparison,
     build_receive_concrete_anchor_prompt,
     coach_metaphor,
+    generate_contextual_choices,
     generate_symbolic_world_choices,
     has_receive_concrete_anchor,
     interpret_turn,
@@ -46,8 +47,18 @@ def build_assistant_message(
         if state == "intake_problem":
             return state, "Descreva o problema em uma frase simples.", [], None
         if state == "generate_candidates":
-            artifact = generate_symbolic_world_choices()
-            return "present_choices", RECEIVE_SYMBOLIC_GUIDE_MESSAGE, [artifact], None
+            provider = provider_factory()
+            interpretation = interpret_turn(provider, current_state=state, user_input=user_input)
+            if interpretation.intent == "user_introduced_metaphor":
+                interpretation.assistant_response_kind = "receive_llm_question"
+                return "refine_selected", coach_metaphor(provider, user_input), [], interpretation
+
+            interpretation.assistant_response_kind = "receive_symbolic_world_prompt"
+            try:
+                artifact = generate_contextual_choices(provider, user_input)
+            except Exception:
+                artifact = generate_symbolic_world_choices()
+            return "present_choices", RECEIVE_SYMBOLIC_GUIDE_MESSAGE, [artifact], interpretation
         if state in {"present_choices", "refine_selected"}:
             interpretation = interpret_turn(provider_factory(), current_state=state, user_input=user_input)
             if interpretation.intent == "agent_option_selection":

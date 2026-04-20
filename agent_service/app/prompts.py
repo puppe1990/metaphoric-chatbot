@@ -23,6 +23,8 @@ Rules:
 - ask at most one question per turn
 - push toward concrete imagery
 - start by using the user's latest image before suggesting a new one
+- if the user names a vivid image in a single word or short phrase, keep that exact image active
+  instead of swapping it for a stock equivalent from the symbolic world
 - never invalidate the user's image literally; reinterpret or redirect it
 - give brief provisional syntheses such as "então..." or "isso começa a ficar..."
 - move from identity judgments toward mechanism, movement, scene, and process
@@ -114,6 +116,8 @@ Rules:
 - write in Brazilian Portuguese-compatible semantics
 - return valid JSON only
 - if the user introduces a concrete new image or scene, prefer user_introduced_metaphor
+- single vivid image nouns or short image phrases like "monstro", "muralha", "ponte",
+  "engrenagem", "catapulta" also count as user_introduced_metaphor
 - literal phrases about conversations, work problems, or difficult situations
   are problem_statement unless they introduce a concrete image
 - do not treat literal problem statements with articles like

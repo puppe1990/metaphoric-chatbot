@@ -380,16 +380,24 @@ def build_contextual_user_input(
     messages: list[MessageRecord],
     content: str,
     artifacts: list[ArtifactRecord] | None = None,
+    active_metaphor_seed: str | None = None,
 ) -> str:
     transcript = "\n".join(
         f"{message.role}: {message.content}" for message in messages if message.role in {"assistant", "user"}
     )
     symbolic_world_context = _get_selected_symbolic_world_context(artifacts or [])
+    active_seed_context = (
+        f"active_metaphor_seed: {active_metaphor_seed.strip()}"
+        if active_metaphor_seed and active_metaphor_seed.strip()
+        else ""
+    )
+    context_lines = [line for line in (symbolic_world_context, active_seed_context) if line]
+    context_prefix = "\n".join(context_lines)
 
     if not transcript:
-        return f"{symbolic_world_context}\nuser: {content}".strip() if symbolic_world_context else content
+        return f"{context_prefix}\nuser: {content}".strip() if context_prefix else content
 
-    context_prefix = f"{symbolic_world_context}\n" if symbolic_world_context else ""
+    context_prefix = f"{context_prefix}\n" if context_prefix else ""
     return f"{context_prefix}{transcript}\nuser: {content}"
 
 
@@ -495,7 +503,12 @@ def create_app(database_url: str | None = None) -> FastAPI:
             resolved_state, assistant_message, artifacts, interpretation = build_assistant_message(
                 mode=session.mode,
                 state=state_for_response,
-                user_input=build_contextual_user_input(existing_messages, content, existing_artifacts),
+                user_input=build_contextual_user_input(
+                    existing_messages,
+                    content,
+                    existing_artifacts,
+                    active_metaphor_seed=session.active_metaphor_seed,
+                ),
                 provider_factory=lambda: resolve_provider(db),
                 receive_llm_question_count=session.receive_llm_question_count,
             )
@@ -577,7 +590,12 @@ def create_app(database_url: str | None = None) -> FastAPI:
                 if artifact.artifact_type == "receive_final_comparison":
                     _spawn_receive_final_comparison_generation(
                         artifact.id,
-                        user_input=build_contextual_user_input(existing_messages, content, existing_artifacts),
+                        user_input=build_contextual_user_input(
+                            existing_messages,
+                            content,
+                            existing_artifacts,
+                            active_metaphor_seed=interpretation.active_metaphor_seed or session.active_metaphor_seed,
+                        ),
                         config=provider_config,
                     )
                     break
